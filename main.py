@@ -28,6 +28,7 @@ from models.Wasserstein.train_wasserstein import train_wasserstein
 from models.MCD.train_mcd import train_mcd
 from models.CDAN_VAT.train_cdan_vat import train_cdan_vat
 from models.CDAN_ICAN.train_cdan_ican import train_cdan_ican
+from models.CDAN_IW.train_cdan_iw import train_cdan_iw
 
 def train(config):
     if config['models'] == 'sourceonly':
@@ -52,7 +53,8 @@ def train(config):
         train_cdan_vat(config)
     elif config['models'] == 'CDAN_ICAN':
         train_cdan_ican(config)
-
+    elif config['models'] == 'CDAN_IW':
+        train_cdan_iw(config)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Transfer Learning')

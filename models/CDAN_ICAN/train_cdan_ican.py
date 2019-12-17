@@ -245,6 +245,10 @@ def train_cdan_ican(config):
             # pseudo_class_loss = class_criterion(pseudo_class, pseudo_preds)
 
             pseudo_epoch_loss += float(pseudo_class_loss)
+
+            # 这个正确率没有意义
+            # pseudo_preds 是pseudo_class的最大值，是target train的预测值
+            # pseudo_labels 是上一个函数（选择pseudo-set时）计算出来的，同样的公式
             pseudo_epoch_corrects += int(torch.sum(pseudo_preds.squeeze() == pseudo_labels.squeeze()))
 
             pseudo_loss = pseudo_class_loss
@@ -257,7 +261,7 @@ def train_cdan_ican(config):
         pseudo_avg_loss = pseudo_epoch_loss / pseudo_batch_count
         pseudo_epoch_acc = pseudo_epoch_corrects / pseudo_sample_count
 
-        print('Epoch {}, Phase: {} Loss: {:.4f} Acc: {:.4f} Disc_Lam: {:.6f} Disc_bias: {:.4f} '.format(
+        print('Epoch {}, Phase: {}, Loss: {:.4f} Acc: {:.4f} Disc_Lam: {:.6f} Disc_bias: {:.4f} '.format(
                 epoch, 'Pseudo_train', pseudo_avg_loss, pseudo_epoch_acc, epoch_discrim_lambda, epoch_discrim_bias))
 
 
@@ -398,15 +402,11 @@ def train_cdan_ican(config):
         batch_count = 0
         target_pointer = 0
         target_pointer = 0
-        class_count = 0
-        epoch_loss = 0.0
-        epoch_corrects = 0
         pseudo_pointer = 0
         pseudo_source_pointer = 0
         INI_MAIN_THRESH = -0.8
         # pre_epochs = 10
         pre_epochs = 0
-
 
         set_training_mode(extractor, True)
         set_training_mode(classifier, True)
@@ -414,12 +414,15 @@ def train_cdan_ican(config):
         set_training_mode(disc_activate, False)
 
 
-        domain_epoch_loss = 0.0
-        ini_w_main = torch.FloatTensor([float(INI_MAIN_THRESH)]).cuda()
-        epoch_batch_count = 0
-        total_epoch_loss = 0.0
-        domain_epoch_corrects = 0
-        domain_counts = 0
+        # class_count = 0
+        # epoch_loss = 0.0
+        # epoch_corrects = 0
+        # domain_epoch_loss = 0.0
+        # ini_w_main = torch.FloatTensor([float(INI_MAIN_THRESH)]).cuda()
+        # epoch_batch_count = 0
+        # total_epoch_loss = 0.0
+        # domain_epoch_corrects = 0
+        # domain_counts = 0
 
 
         for data in dset_loaders['source']:
@@ -464,7 +467,6 @@ def train_cdan_ican(config):
                 # target域使用经过筛选的pseudo-set数据
                 pseudo_weights = torch.FloatTensor([])
                 pseudo_size = len(pseudo_dict)
-                # print(pseudo_size)
 
                 # 重置索引位置
                 if (pseudo_pointer >= len(pseudo_dict) - 1) and (len(pseudo_dict) != 0) :
@@ -555,11 +557,6 @@ def train_cdan_ican(config):
 
     def train_ican(extractor, classifier, ad_net, disc_activate, config, epoch):
         # start_epoch = 0
-
-        # extractor.train()
-        # classifier.train()
-        # ad_net.train()
-        # disc_activate.train()
 
         # 1. 计算在source上的准确度，用于选择伪标签
         accuracy_s = test(extractor, classifier, config['source_test_loader'], epoch)
