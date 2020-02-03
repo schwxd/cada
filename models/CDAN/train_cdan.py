@@ -8,26 +8,40 @@ import torch.optim as optim
 
 import models.CDAN.cdan_loss as loss_func
 
-from functions import test, set_log_config
 from network import Extractor, Classifier, Critic, Critic2, RandomLayer, AdversarialNetwork
-from vis import draw_tsne, draw_confusion_matrix
+from resnet18_1d import resnet18_features
+from models.inceptionv4 import InceptionV4
+from models.inceptionv1 import InceptionV1
+
+from torchsummary import summary
+from utils.functions import test, set_log_config
+from utils.vis import draw_tsne, draw_confusion_matrix
 
 
 def train_cdan(config):
-    extractor = Extractor(n_flattens=config['n_flattens'], n_hiddens=config['n_hiddens'])
+    # if config['inception'] == 1:
+    #     #extractor = create_inception(1, 32, depth=4)
+    #     extractor = InceptionV4(num_classes=32)
+    # else:
+    #     extractor = Extractor(n_flattens=config['n_flattens'], n_hiddens=config['n_hiddens'])
+    # #extractor = resnet18_features(False)
+    # classifier = Classifier(n_flattens=config['n_flattens'], n_hiddens=config['n_hiddens'], n_class=config['n_class'])
+    extractor = InceptionV1(num_classes=32)
     classifier = Classifier(n_flattens=config['n_flattens'], n_hiddens=config['n_hiddens'], n_class=config['n_class'])
+
     if torch.cuda.is_available():
         extractor = extractor.cuda()
         classifier = classifier.cuda()
+        #summary(extractor, (1, 5120))
 
     cdan_random = config['random_layer'] 
-    res_dir = os.path.join(config['res_dir'], 'random{}-bs{}-lr{}'.format(cdan_random, config['batch_size'], config['lr']))
+    res_dir = os.path.join(config['res_dir'], 'inception{}-normal{}-lr{}'.format(config['inception'], config['normal'], config['lr']))
     if not os.path.exists(res_dir):
         os.makedirs(res_dir)
 
     print('train_cdan')
-    print(extractor)
-    print(classifier)
+    #print(extractor)
+    #print(classifier)
     print(config)
 
     set_log_config(res_dir)
@@ -125,8 +139,8 @@ def train_cdan(config):
         for epoch in range(1, config['n_epochs'] + 1):
             train(extractor, classifier, ad_net, config, epoch)
             if epoch % config['TEST_INTERVAL'] == 0:
-                print('test on source_test_loader')
-                test(extractor, classifier, config['source_test_loader'], epoch)
+                # print('test on source_test_loader')
+                # test(extractor, classifier, config['source_test_loader'], epoch)
                 print('test on target_test_loader')
                 accuracy = test(extractor, classifier, config['target_test_loader'], epoch)
 
@@ -142,7 +156,7 @@ def train_cdan(config):
             if epoch % config['VIS_INTERVAL'] == 0:
                 title = config['models']
                 draw_confusion_matrix(extractor, classifier, config['target_test_loader'], res_dir, epoch, title)
-                draw_tsne(extractor, classifier, config['source_test_loader'], config['target_test_loader'], res_dir, epoch, title, separate=True)
+                draw_tsne(extractor, classifier, config['source_train_loader'], config['target_test_loader'], res_dir, epoch, title, separate=True)
                 # draw_tsne(extractor, classifier, config['source_test_loader'], config['target_test_loader'], res_dir, epoch, title, separate=False)
     else:
         if os.path.exists(extractor_path) and os.path.exists(classifier_path) and os.path.exists(adnet_path):
@@ -151,14 +165,15 @@ def train_cdan(config):
             ad_net.load_state_dict(torch.load(adnet_path))
             print('Test only mode, model loaded')
 
-            print('test on source_test_loader')
-            test(extractor, classifier, config['source_test_loader'], -1)
+            # print('test on source_test_loader')
+            # test(extractor, classifier, config['source_test_loader'], -1)
             print('test on target_test_loader')
             test(extractor, classifier, config['target_test_loader'], -1)
 
             title = config['models']
             draw_confusion_matrix(extractor, classifier, config['target_test_loader'], res_dir, -1, title)
-            draw_tsne(extractor, classifier, config['source_test_loader'], config['target_test_loader'], res_dir, -1, title, separate=True)
+            # draw_tsne(extractor, classifier, config['source_test_loader'], config['target_test_loader'], res_dir, -1, title, separate=True)
+            draw_tsne(extractor, classifier, config['source_train_loader'], config['target_test_loader'], res_dir, -1, title, separate=True)
         else:
             print('no saved model found')
 

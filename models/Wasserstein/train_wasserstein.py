@@ -6,14 +6,16 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 
-from functions import test, set_log_config, set_requires_grad, gradient_penalty
+from utils.functions import test, set_log_config, set_requires_grad, gradient_penalty
 from network import Extractor, Classifier, Critic, Critic2, RandomLayer, AdversarialNetwork
-from vis import draw_tsne, draw_confusion_matrix
+from utils.vis import draw_tsne, draw_confusion_matrix
+from models.inceptionv1 import InceptionV1
 
 from models.Wasserstein.triplet_loss import triplet_loss
 
 def train_wasserstein(config):
-    extractor = Extractor(n_flattens=config['n_flattens'], n_hiddens=config['n_hiddens'])
+    # extractor = Extractor(n_flattens=config['n_flattens'], n_hiddens=config['n_hiddens'])
+    extractor = InceptionV1(num_classes=32)
     classifier = Classifier(n_flattens=config['n_flattens'], n_hiddens=config['n_hiddens'], n_class=config['n_class'])
     critic = Critic(n_flattens=config['n_flattens'], n_hiddens=config['n_hiddens'])
     if torch.cuda.is_available():
@@ -208,8 +210,8 @@ def train_wasserstein(config):
     for epoch in range(EPOCH_START, config['n_epochs'] + 1):
         train(extractor, classifier, critic, config, epoch)
         if epoch % TEST_INTERVAL == 0:
-            print('test on source_test_loader')
-            test(extractor, classifier, config['source_test_loader'], epoch)
+            # print('test on source_test_loader')
+            # test(extractor, classifier, config['source_test_loader'], epoch)
             # print('test on target_train_loader')
             # test(model, config['target_train_loader'], epoch)
             print('test on target_test_loader')
@@ -220,7 +222,7 @@ def train_wasserstein(config):
             else:
                 title = '(b) TLADA'
             draw_confusion_matrix(extractor, classifier, config['target_test_loader'], res_dir, epoch, title)
-            draw_tsne(extractor, classifier, config['source_test_loader'], config['target_test_loader'], res_dir, epoch, title, separate=True)
+            draw_tsne(extractor, classifier, config['source_train_loader'], config['target_test_loader'], res_dir, epoch, title, separate=True)
             # draw_tsne(extractor, classifier, config['source_test_loader'], config['target_test_loader'], res_dir, epoch, title, separate=False)
     if triplet_type == 'none':
         torch.save(extractor.state_dict(), extractor_path)

@@ -6,10 +6,13 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 
-from functions import test, set_log_config, set_requires_grad
+from utils.functions import test, set_log_config, set_requires_grad, ReverseLayerF
 from network import Extractor, Classifier, Critic, Critic2, RandomLayer, AdversarialNetwork
-from vis import draw_tsne, draw_confusion_matrix
-from functions import ReverseLayerF
+from utils.vis import draw_tsne, draw_confusion_matrix
+from models.inceptionv4 import InceptionV4
+from models.inceptionv1 import InceptionV1
+
+from torchsummary import summary
 
 import torch.nn.functional as F
 
@@ -20,7 +23,11 @@ def discrepancy(out1, out2):
     return torch.mean(torch.abs(F.softmax(out1, dim=1) - F.softmax(out2, dim=1)))
 
 def train_mcd(config):
-    G = Extractor(n_flattens=config['n_flattens'], n_hiddens=config['n_hiddens'])
+    if config['inception'] == 1:
+        # G = InceptionV4(num_classes=32)
+        G = InceptionV1(num_classes=32)
+    else:
+        G = Extractor(n_flattens=config['n_flattens'], n_hiddens=config['n_hiddens'])
     C1 = Classifier(n_flattens=config['n_flattens'], n_hiddens=config['n_hiddens'], n_class=config['n_class'])
     C2 = Classifier(n_flattens=config['n_flattens'], n_hiddens=config['n_hiddens'], n_class=config['n_class'])
     if torch.cuda.is_available():
@@ -72,23 +79,21 @@ def train_mcd(config):
             opt_c1.zero_grad()
             opt_c2.zero_grad()
 
+            # 源分类误差
+            opt_g.zero_grad()
+            opt_c1.zero_grad()
+            opt_c2.zero_grad()
 
-            if epoch <= 2000:
-                for _ in range(1):
-                    # 源分类误差
-                    opt_g.zero_grad()
-                    opt_c1.zero_grad()
-                    opt_c2.zero_grad()
-                    feat_s = G(data_source)
-                    output_s1 = C1(feat_s)
-                    output_s2 = C2(feat_s)
-                    loss_s1 = criterion(output_s1, label_source)
-                    loss_s2 = criterion(output_s2, label_source)
-                    loss_s = loss_s1 + loss_s2
-                    loss_s.backward()
-                    opt_g.step()
-                    opt_c1.step()
-                    opt_c2.step()
+            feat_s = G(data_source)
+            output_s1 = C1(feat_s)
+            output_s2 = C2(feat_s)
+            loss_s1 = criterion(output_s1, label_source)
+            loss_s2 = criterion(output_s2, label_source)
+            loss_s = loss_s1 + loss_s2
+            loss_s.backward()
+            opt_g.step()
+            opt_c1.step()
+            opt_c2.step()
 
 
             # 源分类误差 - 源和目的特征差异
@@ -210,12 +215,12 @@ def train_mcd(config):
             train(G, C1, C2, config, epoch)
 
         if epoch % config['TEST_INTERVAL'] == 0:
-            print('C1 on source_test_loader')
-            logging.debug('C1 on source_test_loader')
-            test(G, C1, config['source_test_loader'], epoch)
-            print('C2 on source_test_loader')
-            logging.debug('C2 on source_test_loader')
-            test(G, C2, config['source_test_loader'], epoch)
+            #print('C1 on source_test_loader')
+            #logging.debug('C1 on source_test_loader')
+            #test(G, C1, config['source_test_loader'], epoch)
+            #print('C2 on source_test_loader')
+            #logging.debug('C2 on source_test_loader')
+            #test(G, C2, config['source_test_loader'], epoch)
             print('C1 on target_test_loader')
             logging.debug('C1 on target_test_loader')
             test(G, C1, config['target_test_loader'], epoch)
@@ -224,5 +229,6 @@ def train_mcd(config):
             test(G, C2, config['target_test_loader'], epoch)
         if epoch % config['VIS_INTERVAL'] == 0:
             draw_confusion_matrix(G, C1, config['target_test_loader'], res_dir, epoch, config['models'])
-            draw_tsne(G, C1, config['source_test_loader'], config['target_test_loader'], res_dir, epoch, config['models'], separate=True)
+            draw_tsne(G, C1, config['source_train_loader'], config['target_test_loader'], res_dir, epoch, config['models'], separate=True)
+            draw_tsne(G, C1, config['source_train_loader'], config['target_test_loader'], res_dir, epoch, config['models'], separate=False)
             # draw_tsne(G, C1, config['source_test_loader'], config['target_test_loader'], res_dir, epoch, config['models'], separate=False)

@@ -7,27 +7,40 @@ import torch.nn as nn
 import torch.optim as optim
 
 import models.CDAN_IW.cdan_loss as loss_func
+from models.CDAN_IW.Coral import CORAL 
 
-from functions import test, set_log_config
+from utils.functions import test, set_log_config
 from network import Extractor, Classifier, Critic, Critic2, RandomLayer, AdversarialNetwork
-from vis import draw_tsne, draw_confusion_matrix
+from utils.vis import draw_tsne, draw_confusion_matrix
+from models.inceptionv4 import InceptionV4
+from models.inceptionv1 import InceptionV1
 
+from torchsummary import summary
 
 def train_cdan_iw(config):
-    extractor = Extractor(n_flattens=config['n_flattens'], n_hiddens=config['n_hiddens'])
+    # if config['inception'] == 1:
+    #     #extractor = create_inception(1, 32, depth=4)
+    #     extractor = InceptionV4(num_classes=32)
+    # else:
+    #     extractor = Extractor(n_flattens=config['n_flattens'], n_hiddens=config['n_hiddens'])
+    # #extractor = Extractor(n_flattens=config['n_flattens'], n_hiddens=config['n_hiddens'])
+    # classifier = Classifier(n_flattens=config['n_flattens'], n_hiddens=config['n_hiddens'], n_class=config['n_class'])
+    extractor = InceptionV1(num_classes=32)
     classifier = Classifier(n_flattens=config['n_flattens'], n_hiddens=config['n_hiddens'], n_class=config['n_class'])
+
     if torch.cuda.is_available():
         extractor = extractor.cuda()
         classifier = classifier.cuda()
+        #summary(extractor, (1, 5120))
 
     cdan_random = config['random_layer'] 
-    res_dir = os.path.join(config['res_dir'], 'random{}-bs{}-lr{}'.format(cdan_random, config['batch_size'], config['lr']))
+    res_dir = os.path.join(config['res_dir'], 'normal{}-lr{}'.format(config['normal'], config['lr']))
     if not os.path.exists(res_dir):
         os.makedirs(res_dir)
 
     print('train_cdan')
-    print(extractor)
-    print(classifier)
+    #print(extractor)
+    #print(classifier)
     print(config)
 
     set_log_config(res_dir)
@@ -103,12 +116,23 @@ def train_cdan_iw(config):
                 # ad_out = ad_net(op_out.view(-1, softmax_output.size(1) * feature.size(1)), gamma, training=False)
                 # dom_entropy = loss_func.Entropy(ad_out)
 
+                #tmp = torch.ones_like(softmax_output_s)
                 op_out = torch.bmm(softmax_output_s.unsqueeze(2), h_s.unsqueeze(1))
+                #op_out = torch.bmm(tmp.unsqueeze(2), h_s.unsqueeze(1))
                 gamma = 2 / (1 + math.exp(-10 * (epoch) / config['n_epochs'])) - 1
                 ad_out = ad_net(op_out.view(-1, softmax_output_s.size(1) * h_s.size(1)), gamma, training=False)
-                dom_entropy = loss_func.Entropy(ad_out)
-                # dom_entropy = 1-(torch.abs(0.5-dom_entropy))**2
-                dom_entropy = 1-(torch.abs(0.5-dom_entropy))**2
+                #dom_entropy = loss_func.Entropy(ad_out)
+                #dom_entropy = 1-(torch.abs(0.5-dom_entropy))**2
+
+                #dom_entropy = 1-(torch.abs(0.5-ad_out))**2
+                #dom_weight = dom_entropy
+
+                dom_entropy = 1-(torch.abs(0.5-ad_out))**2
+                #dom_entropy = loss_func.Entropy(dom_entropy)
+                dom_weight = dom_entropy / torch.sum(dom_entropy)
+              
+
+                ### dom_weight = dom_entropy / torch.sum(dom_entropy)
 
                 # print('ad_out {}, dom_entropy {}'.format(ad_out.size(), dom_entropy.size()))
 
@@ -116,7 +140,7 @@ def train_cdan_iw(config):
                 # entropy.register_hook(grl_hook(coeff))
                 # dom_entropy = 1.0+torch.exp(-dom_entropy)
                 # dom_weight = dom_entropy / torch.sum(dom_entropy).detach().item()
-                dom_weight = dom_entropy / torch.sum(dom_entropy)
+                ### dom_weight = dom_entropy / torch.sum(dom_entropy)
                 # print('ad_out {}, dom_entropy {}, dom_weight {}'.format(ad_out.size(), dom_entropy.size(), dom_weight.size()))
 
             """
@@ -160,13 +184,19 @@ def train_cdan_iw(config):
             else:
                 d_loss = 0
 
-            loss = cls_loss + d_loss
+            #coral
+            coral_loss = CORAL(h_s, h_t)
+
+
+
+            #loss = cls_loss + d_loss
+            loss = cls_loss + d_loss + gamma * coral_loss
             loss.backward()
             optimizer.step()
             if epoch > start_epoch:
                 optimizer_ad.step()
             if (step) % 20 == 0:
-                print('Train Epoch {} closs {:.6f}, dloss {:.6f}, Loss {:.6f}'.format(epoch, cls_loss.item(), d_loss.item(), loss.item()))
+                print('Train Epoch {} closs {:.6f}, dloss {:.6f}, coral_loss {:.6f}, Loss {:.6f}'.format(epoch, cls_loss.item(), d_loss.item(), coral_loss.item(), loss.item()))
 
     if config['testonly'] == 0:
         best_accuracy = 0
@@ -174,8 +204,8 @@ def train_cdan_iw(config):
         for epoch in range(1, config['n_epochs'] + 1):
             train(extractor, classifier, ad_net, config, epoch)
             if epoch % config['TEST_INTERVAL'] == 0:
-                print('test on source_test_loader')
-                test(extractor, classifier, config['source_test_loader'], epoch)
+                # print('test on source_test_loader')
+                # test(extractor, classifier, config['source_test_loader'], epoch)
                 print('test on target_test_loader')
                 accuracy = test(extractor, classifier, config['target_test_loader'], epoch)
 
@@ -191,8 +221,8 @@ def train_cdan_iw(config):
             if epoch % config['VIS_INTERVAL'] == 0:
                 title = config['models']
                 draw_confusion_matrix(extractor, classifier, config['target_test_loader'], res_dir, epoch, title)
-                draw_tsne(extractor, classifier, config['source_test_loader'], config['target_test_loader'], res_dir, epoch, title, separate=True)
-                # draw_tsne(extractor, classifier, config['source_test_loader'], config['target_test_loader'], res_dir, epoch, title, separate=False)
+                draw_tsne(extractor, classifier, config['source_train_loader'], config['target_test_loader'], res_dir, epoch, title, separate=True)
+                draw_tsne(extractor, classifier, config['source_train_loader'], config['target_test_loader'], res_dir, epoch, title, separate=False)
     else:
         if os.path.exists(extractor_path) and os.path.exists(classifier_path) and os.path.exists(adnet_path):
             extractor.load_state_dict(torch.load(extractor_path))
@@ -200,14 +230,14 @@ def train_cdan_iw(config):
             ad_net.load_state_dict(torch.load(adnet_path))
             print('Test only mode, model loaded')
 
-            print('test on source_test_loader')
-            test(extractor, classifier, config['source_test_loader'], -1)
+            # print('test on source_test_loader')
+            # test(extractor, classifier, config['source_test_loader'], -1)
             print('test on target_test_loader')
             test(extractor, classifier, config['target_test_loader'], -1)
 
             title = config['models']
             draw_confusion_matrix(extractor, classifier, config['target_test_loader'], res_dir, -1, title)
-            draw_tsne(extractor, classifier, config['source_test_loader'], config['target_test_loader'], res_dir, -1, title, separate=True)
+            # draw_tsne(extractor, classifier, config['source_test_loader'], config['target_test_loader'], res_dir, -1, title, separate=True)
         else:
             print('no saved model found')
 

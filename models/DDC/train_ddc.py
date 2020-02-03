@@ -6,19 +6,29 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 
-from functions import test, set_log_config
+from utils.functions import test, set_log_config
 from network import Extractor, Classifier, Critic, Critic2, RandomLayer, AdversarialNetwork
-from vis import draw_tsne, draw_confusion_matrix
+from utils.vis import draw_tsne, draw_confusion_matrix
+from models.inceptionv4 import InceptionV4
+from models.inceptionv1 import InceptionV1
+
 
 # import models.DDC.mmd
 from models.DDC.mmd import mmd_linear
 
 def train_ddc(config):
-    extractor = Extractor(n_flattens=config['n_flattens'], n_hiddens=config['n_hiddens'])
+    # if config['inception'] == 1:
+    #     extractor = InceptionV4(num_classes=32)
+    # else:
+    #     extractor = Extractor(n_flattens=config['n_flattens'], n_hiddens=config['n_hiddens'])
+    # classifier = Classifier(n_flattens=config['n_flattens'], n_hiddens=config['n_hiddens'], n_class=config['n_class'])
+    extractor = InceptionV1(num_classes=32)
     classifier = Classifier(n_flattens=config['n_flattens'], n_hiddens=config['n_hiddens'], n_class=config['n_class'])
+
     if torch.cuda.is_available():
         extractor = extractor.cuda()
         classifier = classifier.cuda()
+        summary(extractor, (1, 5120))
 
     res_dir = os.path.join(config['res_dir'], 'lr{}-mmdgamma{}'.format(config['lr'], config['mmd_gamma']))
     if not os.path.exists(res_dir):
@@ -76,11 +86,11 @@ def train_ddc(config):
     for epoch in range(1, config['n_epochs'] + 1):
         train(extractor, classifier, config, epoch)
         if epoch % config['TEST_INTERVAL'] == 0:
-            print('test on source_test_loader')
-            test(extractor, classifier, config['source_test_loader'], epoch)
+            # print('test on source_test_loader')
+            # test(extractor, classifier, config['source_test_loader'], epoch)
             print('test on target_test_loader')
             test(extractor, classifier, config['target_test_loader'], epoch)
         if epoch % config['VIS_INTERVAL'] == 0:
             draw_confusion_matrix(extractor, classifier, config['target_test_loader'], res_dir, epoch, config['models'])
-            draw_tsne(extractor, classifier, config['source_test_loader'], config['target_test_loader'], res_dir, epoch, config['models'], separate=True)
+            # draw_tsne(extractor, classifier, config['source_test_loader'], config['target_test_loader'], res_dir, epoch, config['models'], separate=True)
             # draw_tsne(extractor, classifier, config['source_test_loader'], config['target_test_loader'], res_dir, epoch, config['models'], separate=False)

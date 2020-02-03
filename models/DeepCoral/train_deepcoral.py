@@ -6,15 +6,20 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 
-from functions import test, set_log_config
+from utils.functions import test, set_log_config
 from network import Extractor, Classifier, Critic, Critic2, RandomLayer, AdversarialNetwork
-from vis import draw_tsne, draw_confusion_matrix
+from utils.vis import draw_tsne, draw_confusion_matrix
 
 from models.DeepCoral.Coral import CORAL
+from models.inceptionv1 import InceptionV1
+
 
 def train_deepcoral(config):
-    extractor = Extractor(n_flattens=config['n_flattens'], n_hiddens=config['n_hiddens'])
+    # extractor = Extractor(n_flattens=config['n_flattens'], n_hiddens=config['n_hiddens'])
+    # classifier = Classifier(n_flattens=config['n_flattens'], n_hiddens=config['n_hiddens'], n_class=config['n_class'])
+    extractor = InceptionV1(num_classes=32)
     classifier = Classifier(n_flattens=config['n_flattens'], n_hiddens=config['n_hiddens'], n_class=config['n_class'])
+
     if torch.cuda.is_available():
         extractor = extractor.cuda()
         classifier = classifier.cuda()

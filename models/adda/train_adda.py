@@ -6,9 +6,9 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 
-from functions import test, set_log_config, set_requires_grad
 from network import Extractor, Classifier, Critic, Critic2, RandomLayer, AdversarialNetwork
-from vis import draw_tsne, draw_confusion_matrix
+from utils.functions import test, set_log_config, set_requires_grad
+from utils.vis import draw_tsne, draw_confusion_matrix
 
 def train_adda(config):
 

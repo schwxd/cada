@@ -15,9 +15,13 @@ import torch.nn as nn
 import torch.optim as optim
 
 # custom imports
-from cwru_dataset import get_raw_1d
+# from cwru_dataset import get_raw_1d
+# from cwru_dataset_all import get_raw_1d
+from cwru_dataset_normal import get_raw_1d
 
 from models.CNN.train_cnn import train_cnn
+from models.dann_mm.train_dann_mm import train_dann_mm
+from models.dann_mm2.train_dann_mm2 import train_dann_mm2
 from models.DDC.train_ddc import train_ddc
 from models.DeepCoral.train_deepcoral import train_deepcoral
 from models.DAN_JAN.train_dan_jan import train_dan_jan
@@ -26,13 +30,21 @@ from models.adda.train_adda import train_adda
 from models.CDAN.train_cdan import train_cdan
 from models.Wasserstein.train_wasserstein import train_wasserstein
 from models.MCD.train_mcd import train_mcd
+from models.MCD_A.train_mcd_a import train_mcd_a
+
+
 from models.CDAN_VAT.train_cdan_vat import train_cdan_vat
 from models.CDAN_ICAN.train_cdan_ican import train_cdan_ican
 from models.CDAN_IW.train_cdan_iw import train_cdan_iw
+from models.DCTLN.train_dctln import train_dctln
 
 def train(config):
     if config['models'] == 'sourceonly':
         train_cnn(config)
+    if config['models'] == 'dann_mm':
+       train_dann_mm(config)
+    if config['models'] == 'dann_mm2':
+       train_dann_mm2(config)
     elif config['models'] == 'deepcoral':
         train_deepcoral(config)
     elif config['models'] == 'ddc':
@@ -49,12 +61,16 @@ def train(config):
         train_cdan(config)
     elif config['models'] == 'MCD':
         train_mcd(config)
+    elif config['models'] == 'MCD_A':
+        train_mcd_a(config)
     elif config['models'] == 'CDAN_VAT':
         train_cdan_vat(config)
     elif config['models'] == 'CDAN_ICAN':
         train_cdan_ican(config)
     elif config['models'] == 'CDAN_IW':
         train_cdan_iw(config)
+    elif config['models'] == 'DCTLN':
+        train_dctln(config)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Transfer Learning')
@@ -64,6 +80,10 @@ if __name__ == "__main__":
     parser.add_argument('--dest', required=False, default='3HP', help='folder name of dest dataset')
     parser.add_argument('--snr', type=int, required=False, default=0, help='')
     parser.add_argument('--testonly', type=int, required=False, default=0, help='')
+    parser.add_argument('--split', type=float, required=False, default=0.5, help='')
+    parser.add_argument('--normal', type=int, required=False, default=0, help='')
+    parser.add_argument('--inception', type=int, required=False, default=0, help='')
+    parser.add_argument('--aux_classifier', type=int, required=False, default=1, help='')
 
     # model & loss
     parser.add_argument('--models', type=str, default='CDAN_ICAN', help="choose which model to run")
@@ -101,7 +121,6 @@ if __name__ == "__main__":
     os.environ["CUDA_VISIBLE_DEVICES"] = args.gpu_id 
 
     res_dir = 'snapshots_{}/{}--{}'.format(args.models, args.src, args.dest)
-    # res_dir = 'snapshots_{}/{}--{}-flr{}-clr{}-tradeoff{}'.format(args.models, args.src, args.dest, args.flr, args.clr, args.tradeoff)
     if not os.path.exists(res_dir):
         os.makedirs(res_dir)
 
@@ -110,10 +129,18 @@ if __name__ == "__main__":
 
     config = {}
 
-    config['source_train_loader'], classes = get_raw_1d(src_dataset, train=True, batch_size=args.batch_size, snr=args.snr)
-    config['source_test_loader'], _ = get_raw_1d(src_dataset, train=False, batch_size=args.batch_size, snr=args.snr)
-    config['target_train_loader'], _ = get_raw_1d(tgt_dataset, train=True, batch_size=args.batch_size, snr=args.snr)
-    config['target_test_loader'], _ = get_raw_1d(tgt_dataset, train=False, batch_size=args.batch_size, snr=args.snr)
+    config['source_train_loader'], config['source_test_loader'], classes = get_raw_1d(src_dataset, 
+                                                                                        batch_size=args.batch_size, 
+                                                                                        trainonly=False, 
+                                                                                        split=0.8, 
+                                                                                        snr=args.snr, 
+                                                                                        normal=args.normal)
+    config['target_train_loader'], config['target_test_loader'], _ = get_raw_1d(tgt_dataset, 
+                                                                                        batch_size=args.batch_size, 
+                                                                                        trainonly=False, 
+                                                                                        split=args.split, 
+                                                                                        snr=args.snr, 
+                                                                                        normal=args.normal)
 
     config['models'] = args.models
     config['testonly'] = args.testonly
@@ -127,6 +154,9 @@ if __name__ == "__main__":
     config['TEST_INTERVAL'] = args.TEST_INTERVAL
     config['VIS_INTERVAL'] = args.VIS_INTERVAL
     config['snr'] = args.snr
+    config['normal'] = args.normal
+    config['inception'] = args.inception
+    config['aux_classifier'] = args.aux_classifier
 
     config['w_weight'] = args.w_weight
     config['w_gamma'] = args.w_gamma
@@ -138,4 +168,5 @@ if __name__ == "__main__":
     config['mmd_gamma'] = args.mmd_gamma
     config['random_layer'] = args.random_layer
     config['one_step'] = args.one_step
+
     train(config)

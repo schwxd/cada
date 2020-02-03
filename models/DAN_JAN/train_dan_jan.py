@@ -6,10 +6,9 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 
-from functions import test, set_log_config
+from utils.functions import test, set_log_config, ReverseLayerF
+from utils.vis import draw_tsne, draw_confusion_matrix
 from network import Extractor, Classifier, Critic, Critic2, RandomLayer, AdversarialNetwork
-from vis import draw_tsne, draw_confusion_matrix
-from functions import ReverseLayerF
 import models.DAN_JAN.dan_jan_loss as loss
 
 def train_dan_jan(config):
