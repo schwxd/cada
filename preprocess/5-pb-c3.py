@@ -18,15 +18,14 @@ import matplotlib.pyplot as plt
 import scipy.fftpack as fftpack
 from sklearn import preprocessing
 
-FRAME_SIZE = 5120           # 滑动窗口大小
-STEP_SIZE = 5100            # 滑动窗口移动步长
+FRAME_SIZE = 5120           # 默认滑动窗口大小
+STEP_SIZE = 5100            # 默认滑动窗口移动步长
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--dataroot', required=False, default='/nas/data/paderborn', help='where the data folder is')
 parser.add_argument('--framesize', type=int, required=False, default=FRAME_SIZE, help='Frame Size of sliding windows')
 parser.add_argument('--stepsize', type=int, required=False, default=STEP_SIZE, help='Step Size of Sliding window')
 parser.add_argument('--load', type=int, required=False, default=-1, help='Specify one of the load conditions (0/1/2/3). -1 = all')
-# parser.add_argument('--methods', required=False, default='fft', help='preprocess method')
 parser.add_argument('--fft', required=False, type=int, default=0, help='use fft or not')
 parser.add_argument('--train', type=int, required=False, default=1, help='training dataset or testing dataset')
 parser.add_argument('--normal', required=False, type=int, default=0, help='normal or not')
@@ -62,56 +61,6 @@ def feature_segment(filename, matdata, framesize, samplenumber):
     sample_tensor = np.array(samples).astype('float32')
     # print("Load file {} into shape {}".format(filename, sample_tensor.shape))
     return sample_tensor
-
-# def get_labels_list(filelist, ignore_load = True):
-#     """
-#     将去除后缀的文件名作为label，按顺序保存至字典中
-
-#     假设文件名为‘OR007@3-0.mat’，则label为‘OR007@3-0’
-#     OR代表外圈故障，
-#     007代表故障直径，
-#     @3代表故障位置在3点钟方位，
-#     0代表负载为0、速度为1797rpm
-#     """
-
-#     labels_dict = {}        # label：value对应关系表
-#     labels_list = []        # 每个文件的原始label，用于绘制图形时标注文件名
-#     label_value = 0
-#     for filename in filelist:
-#         label1 = filename.split('.')[0]  #去掉文件后缀
-#         if ignore_load:
-#             label2 = label1.split('-')       #去掉工况，如果有的话
-#             if len(label2) > 0:
-#                 label = label2[0]
-#             else:
-#                 label = label1
-#         else:
-#             label = label1
-
-#         if not label in labels_dict:
-#             labels_dict[label] = label_value
-#             label_value += 1
-
-#         labels_list.append(label)
-#     return labels_dict, labels_list
-
-# labels_map = {
-#     "K001": 0,
-#     "K002": 1,
-#     "K003": 2,
-#     "K004": 3,
-#     "K005": 4,
-#     "KA04": 5,
-#     "KA15": 6,
-#     "KA16": 7,
-#     "KA22": 8,
-#     "KA30": 9,
-#     "KI04": 10,
-#     "KI14": 11,
-#     "KI16": 12,
-#     "KI18": 13,
-#     "KI21": 14}
-
 
 labels_map_train = {
     "K002": 0,
@@ -184,19 +133,6 @@ def get_labels_and_loads(filelist, labels_map, loads_map):
         loads_list.append(loads_map[load])
     return loads_list, labels_list
 
-
-def concatenate_datasets(xd, yd, xo, yo):
-    """ 将所有单独的文件合并成完整的数据集
-    """
-
-    if xd is None or yd is None:
-        xd = xo
-        yd = yo
-    else:
-        xd = np.concatenate((xd, xo))
-        yd = np.concatenate((yd, yo))
-    return xd, yd
-
 def calculate_frames_per_class(filename):
     n_samples = 0
     for key in frames_per_class.keys():
@@ -204,53 +140,6 @@ def calculate_frames_per_class(filename):
             n_samples = frames_per_class[key]
     return n_samples
         
-
-# def read_dir_all(dirpath, labels_map, loads_map, framesize, samplenum=0):
-#     """ 读取指定文件夹下所有数据文件
-
-#     dirpath: mat数据文件路径，忽略子文件夹
-#     labels_map: 类标的编号关系
-#     loads_map: 工况的编号关系
-#     framesize：样本的frame大小
-#     samplenumber：如果为0，则用滑动窗口方法生成样本，滑动窗口的大小等同于framesize。如果不为0，则随机采样samplenum条样本
-#     """
-
-#     features = {}
-#     labels = {}
-
-#     # 读取当前文件夹下，以mat后缀结尾的所有文件名
-#     filelist = []
-#     dirlist = os.listdir(dirpath)
-#     for filename in dirlist:
-#         if os.path.isdir(os.path.join(dirpath, filename)):
-#             continue
-#         if not filename.endswith('.mat'):
-#             continue
-#         filelist.append(filename)
-
-#     # 获取文件名对应的类标和工况
-#     loads_list, labels_list = get_labels_and_loads(filelist, labels_map, loads_map)
-
-#     for filename, load, label in zip(filelist, loads_list, labels_list):
-#         # 加载mat文件
-#         matdata = load_matfile(os.path.join(dirpath, filename), filename)
-#         # 生成长度为framesize，总数为frames_per_class[filename]的样本特征
-#         features = feature_segment(matdata, framesize, samplenumber=frames_per_class[filename])
-#         # 生成对应数量的标签
-#         labels = np.ones(features.shape[0], dtype=np.int8) * label
-
-#         # features[load], labels[load] = concatenate_datasets(features[load], labels[load], feature_tensor, feature_label)
-#         # 将相同工况的样本合并
-#         if load in features.keys():
-#             features[load] = np.concatenate((features[load], features))
-#             labels[load] = np.concatenate((labels[load], labels))
-#         else:
-#             features[load] = features
-#             labels[load] = labels
-
-#     return features, labels, loads_list, labels_list
-
-
 def load_files_from_list(filepaths, filenames, labels_map, loads_map, framesize):
     """ 读取指定文件夹下所有数据文件
 
@@ -272,14 +161,15 @@ def load_files_from_list(filepaths, filenames, labels_map, loads_map, framesize)
         # 加载mat文件
         matdata = load_matfile(filepath, filename)
 
+        # 查询该文件应该生成多少个样本
         n_samples = calculate_frames_per_class(filename)
 
-        # 生成长度为framesize，总数为frames_per_class[filename]的样本特征
+        # 生成长度为framesize，总数为n_samples的样本特征
         features = feature_segment(filename, matdata, framesize, samplenumber=n_samples)
+
         # 生成对应数量的标签
         labels = np.ones(features.shape[0], dtype=np.int8) * label
 
-        # features[load], labels[load] = concatenate_datasets(features[load], labels[load], feature_tensor, feature_label)
         # 将相同工况的样本合并
         if load in total_features.keys():
             total_features[load] = np.concatenate((total_features[load], features))
@@ -298,52 +188,6 @@ def to_fft(data, axes):
     print('dimension of fft coeffient to keep: {}'.format(dim_coef))
     re_fft_data = np.fft.fftn(data, axes=axes) 
     return abs(re_fft_data)[:, :dim_coef]
-
-
-def post_process(features, labels):
-    per_class_count = {}    # 每个类的数量（裁剪前）
-
-    features_prune = []     # 裁剪后的features
-    labels_prune = []       # 裁剪后的labels
-    features_prune_test = []     # 裁剪后的features
-    labels_prune_test = []       # 裁剪后的labels
-
-    NUM_PER_CLASS = 4000 
-    NUM_PER_CLASS_TEST = 1000 
-
-    for label in np.unique(labels):
-        # 计算该class的样本数
-        per_class_count[label] = np.sum(np.array(labels == label))
-
-        # 根据key筛选出该class的feature，并乱序
-        feature = features[labels == label]
-        rand_index = np.arange(len(feature))
-        # np.random.seed(0)
-        np.random.shuffle(rand_index)
-        feature = feature[rand_index]
-
-        # 根据per_class_num中定义的每个类要保留的样本数，对该类样本进行裁减，并保存到dict中
-        # 将裁减后的feature保存到列表中
-        features_prune.append(np.array(feature[:NUM_PER_CLASS]))
-        features_prune_test.append(np.array(feature[NUM_PER_CLASS : NUM_PER_CLASS + NUM_PER_CLASS_TEST]))
-
-        # 为裁减后的feature生成标签
-        labels_prune.append(np.full(NUM_PER_CLASS, label))
-        labels_prune_test.append(np.full(NUM_PER_CLASS_TEST, label))
-
-    print("instance count of each classes:")
-    print(per_class_count)
-
-    features_prune = np.concatenate(features_prune, axis=0)
-    labels_prune = np.concatenate(labels_prune, axis=0)
-    features_prune_test = np.concatenate(features_prune_test, axis=0)
-    labels_prune_test = np.concatenate(labels_prune_test, axis=0)
-    # print(features_prune.shape)
-    # print(labels_prune.shape)
-    # print(features_prune_test.shape)
-    # print(labels_prune_test.shape)
-
-    return features_prune, labels_prune, features_prune_test, labels_prune_test
 
 def do_scalar(features, normal):
     if normal == 1:
@@ -370,14 +214,8 @@ if __name__ == '__main__':
     else:
         labels_map = labels_map_test
 
-    # 不适用于每个类一个文件夹的情况
-    # subdirs = os.listdir(data_dir)
-    # for subdir in subdirs:
-    #     # 读取mat文件并生成样本，
-    #     total_features, total_labels, labels_dict, labels_list = read_dir_all(subdir, labels_map, loads_map, framesize=args.framesize, samplenum=frames_per_class[subdir])
-
-    filepaths = []
-    filenames = []
+    filepaths = []  # 文件路径
+    filenames = []  # 去掉后缀的文件名
     subdirs = []
     for roots, dirs, files in os.walk(args.dataroot):
         # 遍历文件夹，看是否需要读取该文件夹
@@ -404,18 +242,12 @@ if __name__ == '__main__':
     #print('total_labels {}'.format(total_labels.keys()))
     #print('labels_dict {}'.format(labels_dict))
     #print('labels_list {}'.format(labels_list))
-
     
     features_prune = {}
     labels_prune = {}
     features_prune_test = {}
     labels_prune_test = {}
     for load in total_features.keys():
-        # 后处理，裁剪数量，归一化等
-        # features, labels, features_test, labels_test = post_process(total_features[load], total_labels[load])
-        # print("Load {}: features: {}, labels: {}".format(load, total_features[load].shape, total_labels[load].shape))
-        # print("Load {} after prune: features {}, labels {}, features_test {}, labels_test {}".format(load, features.shape, labels.shape, features_test.shape, labels_test.shape))
-
         res_dir = "./data/paderborn_train{}_fft{}_normal{}_frame{}/load{}".format(args.train, args.fft, args.normal, args.framesize, load)
         if not os.path.exists(res_dir):
             os.makedirs(res_dir)
@@ -428,11 +260,12 @@ if __name__ == '__main__':
             labels_prune[load] = total_labels[load]
 
         # 归一化
+        # 按照论文ACDIN，归一化不是全局进行的，是在每个batch里做的
         #if args.normal > 0:
         #    features_prune[load] = do_scalar(features_prune[load], args.normal)
         #    draw_fig(features_prune[load], labels_prune[load], count=1, prefix='fft0-norm1', res_dir=res_dir)
 
-        # 再次乱序
+        # 乱序
         rand_index = np.arange(len(features_prune[load]))
         np.random.shuffle(rand_index)
         features = features_prune[load][rand_index]

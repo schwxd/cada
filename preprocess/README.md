@@ -13,4 +13,7 @@
 
 跨故障深度：
     Windows：
+        python 5-pb-c3.py --dataroot=D:\fault\paderborn_dataset --fft=0 --train=0 --normal=0 
+        python 5-pb-c3.py --dataroot=D:\fault\paderborn_dataset --fft=0 --train=1 --normal=0 
+
     服务器：
