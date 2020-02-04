@@ -11,7 +11,7 @@ import models.CDAN.cdan_loss as loss_func
 from networks.network import Extractor, Classifier, Critic, Critic2, RandomLayer, AdversarialNetwork
 from networks.resnet18_1d import resnet18_features
 from networks.inceptionv4 import InceptionV4
-from networks.inceptionv1 import InceptionV1
+from networks.inceptionv1 import InceptionV1, InceptionV1s
 
 from torchsummary import summary
 from utils.functions import test, set_log_config
@@ -19,14 +19,13 @@ from utils.vis import draw_tsne, draw_confusion_matrix
 
 
 def train_cdan(config):
-    # if config['inception'] == 1:
-    #     #extractor = create_inception(1, 32, depth=4)
-    #     extractor = InceptionV4(num_classes=32)
-    # else:
-    #     extractor = Extractor(n_flattens=config['n_flattens'], n_hiddens=config['n_hiddens'])
-    # #extractor = resnet18_features(False)
-    # classifier = Classifier(n_flattens=config['n_flattens'], n_hiddens=config['n_hiddens'], n_class=config['n_class'])
-    extractor = InceptionV1(num_classes=32)
+    if config['network'] == 'inceptionv1':
+        extractor = InceptionV1(num_classes=32)
+    elif config['network'] == 'inceptionv1s':
+        extractor = InceptionV1s(num_classes=32)
+    else:
+        extractor = Extractor(n_flattens=config['n_flattens'], n_hiddens=config['n_hiddens'])
+
     classifier = Classifier(n_flattens=config['n_flattens'], n_hiddens=config['n_hiddens'], n_class=config['n_class'])
 
     if torch.cuda.is_available():
@@ -35,7 +34,9 @@ def train_cdan(config):
         #summary(extractor, (1, 5120))
 
     cdan_random = config['random_layer'] 
-    res_dir = os.path.join(config['res_dir'], 'inception{}-normal{}-lr{}'.format(config['inception'], config['normal'], config['lr']))
+    res_dir = os.path.join(config['res_dir'], 'normal{}-{}-lr{}'.format(config['normal'], 
+                                                                        config['network'], 
+                                                                        config['lr']))
     if not os.path.exists(res_dir):
         os.makedirs(res_dir)
 

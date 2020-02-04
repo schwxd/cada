@@ -78,7 +78,8 @@ if __name__ == "__main__":
     parser.add_argument('--src', required=False, default='0HP', help='folder name of src dataset')
     parser.add_argument('--dest', required=False, default='3HP', help='folder name of dest dataset')
     parser.add_argument('--normal', type=int, required=False, default=0, help='')
-    parser.add_argument('--network', required=False, default='cnn', help='which type of network to use. cnn / inception1')
+    parser.add_argument('--network', required=False, default='cnn', help='which type of network to use. cnn / inceptionv1 / inceptionv1s')
+    parser.add_argument('--dilation', type=int, required=False, default=1, help='')
 
     parser.add_argument('--snr', type=int, required=False, default=0, help='')
     parser.add_argument('--testonly', type=int, required=False, default=0, help='')
@@ -116,7 +117,9 @@ if __name__ == "__main__":
     parser.add_argument('--random_layer', required=False, default=False, help='')
 
     # from mcd
-    parser.add_argument('--one_step', required=False, type=int, default=0, help='')
+    parser.add_argument('--mcd_onestep', required=False, type=int, default=0, help='')
+    parser.add_argument('--mcd_vat', required=False, type=int, default=1, help='')
+    parser.add_argument('--mcd_entropy', required=False, type=int, default=1, help='')
 
     args = parser.parse_args()
     os.environ["CUDA_VISIBLE_DEVICES"] = args.gpu_id 
@@ -144,6 +147,8 @@ if __name__ == "__main__":
                                                                                         normal=args.normal)
 
     config['models'] = args.models
+    config['network'] = args.network
+    config['dilation'] = args.dilation
     config['testonly'] = args.testonly
     config['n_class'] = len(classes)
     config['n_epochs'] = args.n_epochs
@@ -168,6 +173,9 @@ if __name__ == "__main__":
 
     config['mmd_gamma'] = args.mmd_gamma
     config['random_layer'] = args.random_layer
-    config['one_step'] = args.one_step
+    config['mcd_onestep'] = args.mcd_onestep
+    config['mcd_vat'] = args.mcd_vat
+    config['mcd_entropy'] = args.mcd_entropy
+
 
     train(config)

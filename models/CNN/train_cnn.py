@@ -10,38 +10,28 @@ import torch.optim as optim
 from torchsummary import summary
 import torch.nn.functional as F
 
-# from models.inceptionv4 import InceptionV4, InceptionV4Aux
 from utils.vis import draw_tsne, draw_confusion_matrix
 from utils.functions import test, set_log_config
 from networks.network import Extractor, Classifier, Critic, Critic2, RandomLayer, AdversarialNetwork, ClassifierAux
-from networks.inceptionv1 import InceptionV1
+from networks.inceptionv1 import InceptionV1, InceptionV1s
 
 
 def train_cnn(config):
-    # if config['inception'] == 1:
-    #     extractor = InceptionV4(num_classes=32)
-    # else:
-    #     extractor = Extractor(n_flattens=config['n_flattens'], n_hiddens=config['n_hiddens'])
-    # if config['aux_classifier'] == 1:
-    #     extractor = InceptionV4Aux(num_classes=32)
-    #     classifier = ClassifierAux(n_flattens=config['n_flattens'], n_hiddens=config['n_hiddens'], n_class=config['n_class'])
-    # elif config['inception'] == 1:
-    #     extractor = InceptionV4(num_classes=32)
-    #     classifier = Classifier(n_flattens=config['n_flattens'], n_hiddens=config['n_hiddens'], n_class=config['n_class'])
-    # else:
-    #     extractor = Extractor(n_flattens=config['n_flattens'], n_hiddens=config['n_hiddens'])
-    #     classifier = Classifier(n_flattens=config['n_flattens'], n_hiddens=config['n_hiddens'], n_class=config['n_class'])
-    extractor = InceptionV1(num_classes=32)
+    if config['network'] == 'inceptionv1':
+        extractor = InceptionV1(num_classes=32, dilation=config['dilation'])
+    elif config['network'] == 'inceptionv1s':
+        extractor = InceptionV1s(num_classes=32, dilation=config['dilation'])
+    else:
+        extractor = Extractor(n_flattens=config['n_flattens'], n_hiddens=config['n_hiddens'])
     classifier = Classifier(n_flattens=config['n_flattens'], n_hiddens=config['n_hiddens'], n_class=config['n_class'])
 
     if torch.cuda.is_available():
         extractor = extractor.cuda()
         classifier = classifier.cuda()
 
-    res_dir = os.path.join(config['res_dir'], 'inception{}-axu{}-normal{}-lr{}'.format(config['normal'], 
-                                                                                        config['inception'],
-                                                                                        config['aux_classifier'],
-                                                                                        config['lr']))
+    res_dir = os.path.join(config['res_dir'], 'normal{}-{}-lr{}'.format(config['normal'], 
+                                                                        config['network'],
+                                                                        config['lr']))
     if not os.path.exists(res_dir):
         os.makedirs(res_dir)
 

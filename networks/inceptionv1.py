@@ -52,12 +52,12 @@ class Inception_Single(nn.Module):
 
         self.branch2 = nn.Sequential(
             BasicConv1d(inf, CM, kernel_size=1, stride=1, dilation=dilation, hasBN=hasBN),
-            BasicConv1d(CM, c2, kernel_size=5, stride=1, padding=4, dilation=dilation, hasBN=hasBN)
+            BasicConv1d(CM, c2, kernel_size=5, stride=1, padding=2*dilation, dilation=dilation, hasBN=hasBN)
         )
 
         self.branch3 = nn.Sequential(
             BasicConv1d(inf, CM, kernel_size=1, stride=1, dilation=dilation, hasBN=hasBN),
-            BasicConv1d(CM, c3, kernel_size=7, stride=1, padding=9, dilation=dilation, hasBN=hasBN)
+            BasicConv1d(CM, c3, kernel_size=7, stride=1, padding=3*dilation, dilation=dilation, hasBN=hasBN)
         )
 
         self.branch4 = nn.Sequential(
@@ -79,6 +79,64 @@ class InceptionV1(nn.Module):
 
     def __init__(self, num_classes=5, hasBN=False, dilation=1):
         super(InceptionV1, self).__init__()
+        # Modules
+        self.features = nn.Sequential(
+            BasicConv1d(1, 64, kernel_size=3, stride=1, dilation=1),
+            nn.MaxPool1d(3, stride=3),
+            BasicConv1d(64, 128, kernel_size=3, stride=1, dilation=1),
+            nn.MaxPool1d(3, stride=3),
+
+            Inception_Single(inf=128, c1=64, c2=64, c3=32, c4=32, dilation=dilation),  # Inception*2
+            Inception_Single(inf=192, c1=64, c2=64, c3=32, c4=32, dilation=dilation),  
+            nn.MaxPool1d(3, stride=3),
+
+            Inception_Single(inf=192, c1=64, c2=64, c3=32, c4=32, dilation=dilation),  # Inception*2
+            Inception_Single(inf=192, c1=64, c2=64, c3=32, c4=32, dilation=dilation),  
+            Inception_Single(inf=192, c1=48, c2=48, c3=32, c4=32, dilation=dilation),  # Inception*3
+            Inception_Single(inf=160, c1=48, c2=48, c3=32, c4=32, dilation=dilation),
+            Inception_Single(inf=160, c1=48, c2=48, c3=32, c4=32, dilation=dilation),
+            nn.MaxPool1d(3, stride=3),
+
+
+            Inception_Single(inf=160, c1=64, c2=96, c3=64, c4=32, dilation=dilation), # Inception*3
+            Inception_Single(inf=256, c1=64, c2=96, c3=64, c4=32, dilation=dilation),
+            Inception_Single(inf=256, c1=64, c2=96, c3=64, c4=32, dilation=dilation),
+            nn.MaxPool1d(3, stride=3),
+
+            Inception_Single(inf=256, c1=128, c2=128, c3=256, c4=96, dilation=dilation),  # Inception*2
+            nn.MaxPool1d(2, stride=2),
+
+            Inception_Single(inf=608, c1=96, c2=96, c3=128, c4=64, dilation=dilation), # Inception5a
+            Inception_Single(inf=384, c1=96, c2=96, c3=128, c4=64, hasBN=False, dilation=dilation), # Inception5b
+            nn.MaxPool1d(2, stride=2)
+        )
+        self.dropout = nn.Dropout(0.2) # in original paper
+        self.last_linear = nn.Linear(1536, num_classes)
+
+    def logits(self, features):
+        #Allows image of any size to be processed
+        adaptiveAvgPoolWidth = features.shape[2]
+        x = F.avg_pool1d(features, kernel_size=adaptiveAvgPoolWidth)
+        x = x.view(x.size(0), -1)
+        x = self.last_linear(x)
+        return x
+
+    def forward(self, x):
+        batch_size = x.size()[0]
+        input_size = x.size()[-1]
+        x = x.view(batch_size, -1, input_size)
+        #print('x shape {}'.format(x.shape))
+        x = self.features(x)
+        x = x.view(x.size(0), -1)
+        #print('x shape2 {}'.format(x.shape))
+        return x
+
+
+# slim版本，裁剪一部分Inception Layer
+class InceptionV1s(nn.Module):
+
+    def __init__(self, num_classes=5, hasBN=False, dilation=1):
+        super(InceptionV1s, self).__init__()
         # Modules
         self.features = nn.Sequential(
             BasicConv1d(1, 64, kernel_size=3, stride=1, dilation=1),
