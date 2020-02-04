@@ -9,10 +9,9 @@ import torch.nn.functional as F
 
 
 import models.CDAN.cdan_loss as loss_func
-
 from utils.functions import test, set_log_config
-from network import Extractor, Classifier, Critic, Critic2, RandomLayer, AdversarialNetwork
 from utils.vis import draw_tsne, draw_confusion_matrix
+from networks.network import Extractor, Classifier, Critic, Critic2, RandomLayer, AdversarialNetwork
 
 draw_dict = {
     "class_loss_point":[],

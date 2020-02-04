@@ -32,7 +32,6 @@ from models.Wasserstein.train_wasserstein import train_wasserstein
 from models.MCD.train_mcd import train_mcd
 from models.MCD_A.train_mcd_a import train_mcd_a
 
-
 from models.CDAN_VAT.train_cdan_vat import train_cdan_vat
 from models.CDAN_ICAN.train_cdan_ican import train_cdan_ican
 from models.CDAN_IW.train_cdan_iw import train_cdan_iw
@@ -75,13 +74,15 @@ def train(config):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Transfer Learning')
     # dataset configs
-    parser.add_argument('--dataroot', required=False, default='E:\Githubs\wdcnn-schwxd\wdcnn_bearning_fault_diagnosis\output\deonly-fft', help='dataroot')
+    parser.add_argument('--dataroot', required=False, default='data', help='dataroot')
     parser.add_argument('--src', required=False, default='0HP', help='folder name of src dataset')
     parser.add_argument('--dest', required=False, default='3HP', help='folder name of dest dataset')
+    parser.add_argument('--normal', type=int, required=False, default=0, help='')
+    parser.add_argument('--network', required=False, default='cnn', help='which type of network to use. cnn / inception1')
+
     parser.add_argument('--snr', type=int, required=False, default=0, help='')
     parser.add_argument('--testonly', type=int, required=False, default=0, help='')
     parser.add_argument('--split', type=float, required=False, default=0.5, help='')
-    parser.add_argument('--normal', type=int, required=False, default=0, help='')
     parser.add_argument('--inception', type=int, required=False, default=0, help='')
     parser.add_argument('--aux_classifier', type=int, required=False, default=1, help='')
 

@@ -7,13 +7,14 @@ import torch.nn as nn
 import torch.optim as optim
 
 import models.CDAN_VAT.cdan_loss as loss_func
-
-from utils.functions import test, set_log_config
-from network import Extractor, Classifier, Critic, Critic2, RandomLayer, AdversarialNetwork
-from utils.vis import draw_tsne, draw_confusion_matrix
-
 from models.CDAN_VAT.vat import VirtualAdversarialPerturbationGenerator
 from models.CDAN_VAT.consistency_losses import KLDivLossWithLogits
+
+from networks.network import Extractor, Classifier, Critic, Critic2, RandomLayer, AdversarialNetwork
+
+from utils.functions import test, set_log_config
+from utils.vis import draw_tsne, draw_confusion_matrix
+
 target_consistency_criterion = KLDivLossWithLogits(reduction='batchmean')
 target_vat_loss_weight = 0.01
 

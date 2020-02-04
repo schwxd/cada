@@ -10,10 +10,10 @@ import models.CDAN_IW.cdan_loss as loss_func
 from models.CDAN_IW.Coral import CORAL 
 
 from utils.functions import test, set_log_config
-from network import Extractor, Classifier, Critic, Critic2, RandomLayer, AdversarialNetwork
 from utils.vis import draw_tsne, draw_confusion_matrix
-from models.inceptionv4 import InceptionV4
-from models.inceptionv1 import InceptionV1
+from networks.network import Extractor, Classifier, Critic, Critic2, RandomLayer, AdversarialNetwork
+from networks.inceptionv4 import InceptionV4
+from networks.inceptionv1 import InceptionV1
 
 from torchsummary import summary
 

@@ -5,17 +5,16 @@ import numpy as np
 import torch
 import torch.nn as nn
 import torch.optim as optim
-
-from utils.functions import test, set_log_config, set_requires_grad, ReverseLayerF
-from network import Extractor, Classifier, Critic, Critic2, RandomLayer, AdversarialNetwork
-from utils.vis import draw_tsne, draw_confusion_matrix
-from models.inceptionv4 import InceptionV4
-from models.inceptionv1 import InceptionV1
-from models.MCD_A.mcd_loss import vat, get_loss_vat, get_loss_entropy
-
+import torch.nn.functional as F
 from torchsummary import summary
 
-import torch.nn.functional as F
+from models.MCD_A.mcd_loss import vat, get_loss_vat, get_loss_entropy
+from networks.network import Extractor, Classifier, Critic, Critic2, RandomLayer, AdversarialNetwork
+from networks.inceptionv4 import InceptionV4
+from networks.inceptionv1 import InceptionV1
+
+from utils.functions import test, set_log_config, set_requires_grad, ReverseLayerF
+from utils.vis import draw_tsne, draw_confusion_matrix
 
 def ent(output):
     return - torch.mean(output * torch.log(output + 1e-6))
@@ -28,6 +27,7 @@ def train_mcd_a(config):
         G = InceptionV1(num_classes=32)
     else:
         G = Extractor(n_flattens=config['n_flattens'], n_hiddens=config['n_hiddens'])
+
     C1 = Classifier(n_flattens=config['n_flattens'], n_hiddens=config['n_hiddens'], n_class=config['n_class'])
     C2 = Classifier(n_flattens=config['n_flattens'], n_hiddens=config['n_hiddens'], n_class=config['n_class'])
     if torch.cuda.is_available():
@@ -59,7 +59,6 @@ def train_mcd_a(config):
         G.train()
         C1.train()
         C2.train()
-
 
         iter_source = iter(config['source_train_loader'])
         iter_target = iter(config['target_train_loader'])

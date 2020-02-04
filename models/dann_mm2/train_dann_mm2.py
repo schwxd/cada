@@ -9,10 +9,10 @@ import torch.nn.functional as F
 
 
 from utils.functions import test, set_log_config, ReverseLayerF
-from network import Extractor, Classifier, Critic, Critic2, RandomLayer, AdversarialNetwork
-from network import Predictor, Predictor_deep
 from utils.vis import draw_tsne, draw_confusion_matrix
-from models.inceptionv4 import InceptionV4, InceptionV4Aux
+from networks.network import Extractor, Classifier, Critic, Critic2, RandomLayer, AdversarialNetwork
+from networks.network import Predictor, Predictor_deep
+from networks.inceptionv4 import InceptionV4, InceptionV4Aux
 from torchsummary import summary
 
 def train_dann_mm2(config):

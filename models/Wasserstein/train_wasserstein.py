@@ -6,12 +6,13 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 
-from utils.functions import test, set_log_config, set_requires_grad, gradient_penalty
-from network import Extractor, Classifier, Critic, Critic2, RandomLayer, AdversarialNetwork
-from utils.vis import draw_tsne, draw_confusion_matrix
-from models.inceptionv1 import InceptionV1
-
 from models.Wasserstein.triplet_loss import triplet_loss
+
+from networks.network import Extractor, Classifier, Critic, Critic2, RandomLayer, AdversarialNetwork
+from networks.inceptionv1 import InceptionV1
+
+from utils.functions import test, set_log_config, set_requires_grad, gradient_penalty
+from utils.vis import draw_tsne, draw_confusion_matrix
 
 def train_wasserstein(config):
     # extractor = Extractor(n_flattens=config['n_flattens'], n_hiddens=config['n_hiddens'])

@@ -8,10 +8,10 @@ import torch.optim as optim
 
 import models.CDAN.cdan_loss as loss_func
 
-from network import Extractor, Classifier, Critic, Critic2, RandomLayer, AdversarialNetwork
-from resnet18_1d import resnet18_features
-from models.inceptionv4 import InceptionV4
-from models.inceptionv1 import InceptionV1
+from networks.network import Extractor, Classifier, Critic, Critic2, RandomLayer, AdversarialNetwork
+from networks.resnet18_1d import resnet18_features
+from networks.inceptionv4 import InceptionV4
+from networks.inceptionv1 import InceptionV1
 
 from torchsummary import summary
 from utils.functions import test, set_log_config

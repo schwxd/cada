@@ -6,12 +6,13 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 
-from utils.functions import test, set_log_config
-from network import Extractor, Classifier, Critic, Critic2, RandomLayer, AdversarialNetwork
-from utils.vis import draw_tsne, draw_confusion_matrix
-
 from models.DeepCoral.Coral import CORAL
-from models.inceptionv1 import InceptionV1
+
+from networks.network import Extractor, Classifier, Critic, Critic2, RandomLayer, AdversarialNetwork
+from networks.inceptionv1 import InceptionV1
+
+from utils.functions import test, set_log_config
+from utils.vis import draw_tsne, draw_confusion_matrix
 
 
 def train_deepcoral(config):

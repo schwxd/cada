@@ -7,10 +7,10 @@ import torch.nn as nn
 import torch.optim as optim
 
 from utils.functions import test, set_log_config, ReverseLayerF
-from network import Extractor, Classifier, Critic, Critic2, RandomLayer, AdversarialNetwork
 from utils.vis import draw_tsne, draw_confusion_matrix
 from models.DDC.mmd import mmd_linear
-from models.inceptionv1 import InceptionV1
+from networks.network import Extractor, Classifier, Critic, Critic2, RandomLayer, AdversarialNetwork
+from networks.inceptionv1 import InceptionV1
 
 def train_dctln(config):
     # extractor = Extractor(n_flattens=config['n_flattens'], n_hiddens=config['n_hiddens'])

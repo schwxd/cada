@@ -11,10 +11,10 @@ from torchsummary import summary
 import torch.nn.functional as F
 
 # from models.inceptionv4 import InceptionV4, InceptionV4Aux
-from models.inceptionv1 import InceptionV1
-from network import Extractor, Classifier, Critic, Critic2, RandomLayer, AdversarialNetwork, ClassifierAux
 from utils.vis import draw_tsne, draw_confusion_matrix
 from utils.functions import test, set_log_config
+from networks.network import Extractor, Classifier, Critic, Critic2, RandomLayer, AdversarialNetwork, ClassifierAux
+from networks.inceptionv1 import InceptionV1
 
 
 def train_cnn(config):

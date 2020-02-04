@@ -6,7 +6,7 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 
-from network import Extractor, Classifier, Critic, Critic2, RandomLayer, AdversarialNetwork
+from networks.network import Extractor, Classifier, Critic, Critic2, RandomLayer, AdversarialNetwork
 from utils.functions import test, set_log_config, set_requires_grad
 from utils.vis import draw_tsne, draw_confusion_matrix
 

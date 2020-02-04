@@ -5,16 +5,16 @@ import numpy as np
 import torch
 import torch.nn as nn
 import torch.optim as optim
+import torch.nn.functional as F
+
+from networks.network import Extractor, Classifier, Critic, Critic2, RandomLayer, AdversarialNetwork
+from networks.inceptionv4 import InceptionV4
+from networks.inceptionv1 import InceptionV1
 
 from utils.functions import test, set_log_config, set_requires_grad, ReverseLayerF
-from network import Extractor, Classifier, Critic, Critic2, RandomLayer, AdversarialNetwork
 from utils.vis import draw_tsne, draw_confusion_matrix
-from models.inceptionv4 import InceptionV4
-from models.inceptionv1 import InceptionV1
 
 from torchsummary import summary
-
-import torch.nn.functional as F
 
 def ent(output):
     return - torch.mean(output * torch.log(output + 1e-6))

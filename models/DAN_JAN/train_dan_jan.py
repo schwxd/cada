@@ -8,8 +8,8 @@ import torch.optim as optim
 
 from utils.functions import test, set_log_config, ReverseLayerF
 from utils.vis import draw_tsne, draw_confusion_matrix
-from network import Extractor, Classifier, Critic, Critic2, RandomLayer, AdversarialNetwork
 import models.DAN_JAN.dan_jan_loss as loss
+from networks.network import Extractor, Classifier, Critic, Critic2, RandomLayer, AdversarialNetwork
 
 def train_dan_jan(config):
     extractor = Extractor(n_flattens=config['n_flattens'], n_hiddens=config['n_hiddens'])
