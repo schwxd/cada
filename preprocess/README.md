@@ -6,7 +6,8 @@
         python 2-ims.py  --normal=0 --fft=0 --framesize=1200 --trainnumber=2000 --dataroot=F:/ds/IMS
         python 3-seu.py  --normal=0 --fft=0 --framesize=1200 --trainnumber=2000 --dataroot=D:/fault/cdan-machines/matdata/seu-bearingset
         python 4-jnu.py --normal=0 --fft=0 --framesize=1200 --trainnumber=2000 --dataroot=D:/fault/cdan-machines/matdata/jnu-bearingset
-
+        python 6-simulink.py --normal=0 --fft=0 --framesize=1200  --dataroot=D:/fault/cada/matdata 
+        # 读取inner.mat, normal.mat, outer.mat三个文件，trainnumber写在了文件中
 
     服务器：
 
