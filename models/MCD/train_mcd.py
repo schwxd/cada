@@ -19,10 +19,38 @@ from torchsummary import summary
 def ent(output):
     return - torch.mean(output * torch.log(output + 1e-6))
 
-def discrepancy(out1, out2):
+def discrepancy_mcd(out1, out2):
     return torch.mean(torch.abs(F.softmax(out1, dim=1) - F.softmax(out2, dim=1)))
 
+# code comes from 2019_CVPR_Sliced wasserstein discrepancy for unsupervised domain adaptation_pytorch
+# not working
+def discrepancy_slice_wasserstein(p1, p2):
+    s = p1.shape
+    if s[1]>1:
+        proj = torch.randn(s[1], 3).cuda()
+        proj *= torch.rsqrt(torch.sum(torch.mul(proj, proj), 0, keepdim=True))
+        # print('p1 {}, proj {}'.format(p1.shape, proj.shape))
+        p1 = torch.matmul(p1, proj)
+        p2 = torch.matmul(p2, proj)
+        # print('p1 {}, p2 {}'.format(p1.shape, p2.shape))
+
+    p1 = torch.topk(p1, s[0], dim=0)[0]
+    p2 = torch.topk(p2, s[0], dim=0)[0]
+    # print('topk p1 {}, p2 {}'.format(p1.shape, p2.shape))
+    dist = p1-p2
+    wdist = torch.mean(torch.mul(dist, dist))
+
+    return wdist
+
 def train_mcd(config):
+    def discrepancy(p1, p2):
+        if config['mcd_swd'] == 1:
+            dist = discrepancy_slice_wasserstein(p1, p2)
+        else:
+            dist = discrepancy_mcd(p1, p2)
+        return dist
+
+
     if config['inception'] == 1:
         # G = InceptionV4(num_classes=32)
         G = InceptionV1(num_classes=32)
@@ -43,7 +71,7 @@ def train_mcd(config):
     opt_c2 = optim.Adam(C2.parameters(), lr=config['lr'])
 
     criterion = torch.nn.CrossEntropyLoss()
-    res_dir = os.path.join(config['res_dir'], 'snr{}-onestep{}-lr{}'.format(config['snr'], config['one_step'], config['lr']))
+    res_dir = os.path.join(config['res_dir'], 'snr{}-swd{}-lr{}'.format(config['snr'], config['mcd_swd'], config['lr']))
     if not os.path.exists(res_dir):
         os.makedirs(res_dir)
 
@@ -209,7 +237,7 @@ def train_mcd(config):
 
 
     for epoch in range(1, config['n_epochs'] + 1):
-        if config['one_step'] == 1:
+        if config['mcd_onestep'] == 1:
             train_onestep(G, C1, C2, config, epoch)
         else:
             train(G, C1, C2, config, epoch)

@@ -120,6 +120,7 @@ if __name__ == "__main__":
     parser.add_argument('--mcd_onestep', required=False, type=int, default=0, help='')
     parser.add_argument('--mcd_vat', required=False, type=int, default=1, help='')
     parser.add_argument('--mcd_entropy', required=False, type=int, default=1, help='')
+    parser.add_argument('--mcd_swd', required=False, type=int, default=0, help='')
 
     args = parser.parse_args()
     os.environ["CUDA_VISIBLE_DEVICES"] = args.gpu_id 
@@ -176,6 +177,6 @@ if __name__ == "__main__":
     config['mcd_onestep'] = args.mcd_onestep
     config['mcd_vat'] = args.mcd_vat
     config['mcd_entropy'] = args.mcd_entropy
-
+    config['mcd_swd'] = args.mcd_swd
 
     train(config)
