@@ -36,6 +36,7 @@ from models.CDAN_VAT.train_cdan_vat import train_cdan_vat
 from models.CDAN_ICAN.train_cdan_ican import train_cdan_ican
 from models.CDAN_IW.train_cdan_iw import train_cdan_iw
 from models.DCTLN.train_dctln import train_dctln
+from models.PADA.train_pada import train_pada
 
 def train(config):
     if config['models'] == 'sourceonly':
@@ -70,6 +71,8 @@ def train(config):
         train_cdan_iw(config)
     elif config['models'] == 'DCTLN':
         train_dctln(config)
+    elif config['models'] == 'PADA':
+        train_pada(config)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Transfer Learning')
@@ -122,6 +125,8 @@ if __name__ == "__main__":
     parser.add_argument('--mcd_entropy', required=False, type=int, default=1, help='')
     parser.add_argument('--mcd_swd', required=False, type=int, default=0, help='')
 
+    parser.add_argument('--pada_cons_w', required=False, type=float, default=1.0, help='')
+
     args = parser.parse_args()
     os.environ["CUDA_VISIBLE_DEVICES"] = args.gpu_id 
 
@@ -139,13 +144,15 @@ if __name__ == "__main__":
                                                                                         trainonly=False, 
                                                                                         split=0.8, 
                                                                                         snr=args.snr, 
-                                                                                        normal=args.normal)
+                                                                                        normal=args.normal,
+                                                                                        slim=0)
     config['target_train_loader'], config['target_test_loader'], _ = get_raw_1d(tgt_dataset, 
                                                                                         batch_size=args.batch_size, 
                                                                                         trainonly=False, 
                                                                                         split=args.split, 
                                                                                         snr=args.snr, 
-                                                                                        normal=args.normal)
+                                                                                        normal=args.normal,
+                                                                                        slim=1)
 
     config['models'] = args.models
     config['network'] = args.network
@@ -178,5 +185,7 @@ if __name__ == "__main__":
     config['mcd_vat'] = args.mcd_vat
     config['mcd_entropy'] = args.mcd_entropy
     config['mcd_swd'] = args.mcd_swd
+
+    config['pada_cons_w'] = args.pada_cons_w
 
     train(config)

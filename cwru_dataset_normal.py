@@ -57,7 +57,7 @@ class Normalize(object):
         return seq
 
 
-def get_raw_1d(rootdir, batch_size, trainonly=False, split=0.5, snr=0, normal=0):
+def get_raw_1d(rootdir, batch_size, trainonly=False, split=0.5, snr=0, normal=0, slim=0):
 
     data = np.load(os.path.join(rootdir, 'data_features_train.npy')).astype(np.float32)
     labels = np.load(os.path.join(rootdir, 'data_labels_train.npy')).astype(np.uint8)
@@ -107,7 +107,30 @@ def get_raw_1d(rootdir, batch_size, trainonly=False, split=0.5, snr=0, normal=0)
         #train_labels = labels[:train_num]
         #test_labels = labels[train_num:]
 
-        train_dataset = BearingDataset(train_features, train_labels, transform=pre_process)
+        # pada
+        # train_dataset移除一部分class，test_dataset不做处理
+        if slim == 1:
+            n_class = len(np.unique(train_labels))
+            classes = np.arange(n_class)
+            np.random.shuffle(classes)
+            half = n_class // 2
+            selected = classes[:half]
+
+            train_features_slim = []
+            train_labels_slim = []
+            for class_label in selected:
+                label = train_labels[train_labels == class_label]
+                feature = train_features[train_labels == class_label]
+                train_features_slim.append(feature)
+                train_labels_slim.append(label)
+            train_features_slim = np.concatenate(train_features_slim, axis=0)
+            train_labels_slim = np.concatenate(train_labels_slim, axis=0)
+            print('selected class: {}'.format(selected))
+            print('train_features_slim {}, train_labels_slim {}'.format(train_features_slim.shape, train_labels_slim.shape))
+            train_dataset = BearingDataset(train_features_slim, train_labels_slim, transform=pre_process)
+        else:
+            train_dataset = BearingDataset(train_features, train_labels, transform=pre_process)
+
         test_dataset = BearingDataset(test_features, test_labels, transform=pre_process)
 
     train_loader = torch.utils.data.DataLoader(
