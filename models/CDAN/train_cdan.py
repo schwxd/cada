@@ -31,11 +31,11 @@ def train_cdan(config):
     if torch.cuda.is_available():
         extractor = extractor.cuda()
         classifier = classifier.cuda()
-        #summary(extractor, (1, 5120))
 
     cdan_random = config['random_layer'] 
-    res_dir = os.path.join(config['res_dir'], 'normal{}-{}-lr{}'.format(config['normal'], 
-                                                                        config['network'], 
+    res_dir = os.path.join(config['res_dir'], 'normal{}-{}-dilation{}-lr{}'.format(config['normal'],
+                                                                        config['network'],
+                                                                        config['dilation'],
                                                                         config['lr']))
     if not os.path.exists(res_dir):
         os.makedirs(res_dir)

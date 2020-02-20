@@ -71,7 +71,11 @@ def train_mcd(config):
     opt_c2 = optim.Adam(C2.parameters(), lr=config['lr'])
 
     criterion = torch.nn.CrossEntropyLoss()
-    res_dir = os.path.join(config['res_dir'], 'snr{}-swd{}-lr{}'.format(config['snr'], config['mcd_swd'], config['lr']))
+    res_dir = os.path.join(config['res_dir'], 'normal{}-{}-dilation{}-swd{}-lr{}'.format(config['normal'],
+                                                                                        config['network'],
+                                                                                        config['dilation'],
+                                                                                        config['mcd_swd'],
+                                                                                        config['lr']))
     if not os.path.exists(res_dir):
         os.makedirs(res_dir)
 

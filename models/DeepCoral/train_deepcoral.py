@@ -9,23 +9,30 @@ import torch.optim as optim
 from models.DeepCoral.Coral import CORAL
 
 from networks.network import Extractor, Classifier, Critic, Critic2, RandomLayer, AdversarialNetwork
-from networks.inceptionv1 import InceptionV1
+from networks.inceptionv1 import InceptionV1, InceptionV1s
 
 from utils.functions import test, set_log_config
 from utils.vis import draw_tsne, draw_confusion_matrix
 
 
 def train_deepcoral(config):
-    # extractor = Extractor(n_flattens=config['n_flattens'], n_hiddens=config['n_hiddens'])
-    # classifier = Classifier(n_flattens=config['n_flattens'], n_hiddens=config['n_hiddens'], n_class=config['n_class'])
-    extractor = InceptionV1(num_classes=32)
+    if config['network'] == 'inceptionv1':
+        extractor = InceptionV1(num_classes=32, dilation=config['dilation'])
+    elif config['network'] == 'inceptionv1s':
+        extractor = InceptionV1s(num_classes=32, dilation=config['dilation'])
+    else:
+        extractor = Extractor(n_flattens=config['n_flattens'], n_hiddens=config['n_hiddens'])
     classifier = Classifier(n_flattens=config['n_flattens'], n_hiddens=config['n_hiddens'], n_class=config['n_class'])
 
     if torch.cuda.is_available():
         extractor = extractor.cuda()
         classifier = classifier.cuda()
 
-    res_dir = os.path.join(config['res_dir'], 'lr{}-mmdgamma{}'.format(config['lr'], config['mmd_gamma']))
+    res_dir = os.path.join(config['res_dir'], 'normal{}-{}-dilation{}-lr{}-mmdgamma{}'.format(config['normal'],
+                                                                                    config['network'],
+                                                                                    config['dilation'],
+                                                                                    config['lr'],
+                                                                                    config['mmd_gamma']))
     if not os.path.exists(res_dir):
         os.makedirs(res_dir)
 
@@ -89,4 +96,4 @@ def train_deepcoral(config):
         if epoch % config['VIS_INTERVAL'] == 0:
             draw_confusion_matrix(extractor, classifier, config['target_test_loader'], res_dir, epoch, config['models'])
             draw_tsne(extractor, classifier, config['source_test_loader'], config['target_test_loader'], res_dir, epoch, config['models'], separate=True)
-            # draw_tsne(extractor, classifier, config['source_test_loader'], config['target_test_loader'], res_dir, epoch, config['models'], separate=False)
+            draw_tsne(extractor, classifier, config['source_test_loader'], config['target_test_loader'], res_dir, epoch, config['models'], separate=False)

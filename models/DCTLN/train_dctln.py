@@ -10,12 +10,15 @@ from utils.functions import test, set_log_config, ReverseLayerF
 from utils.vis import draw_tsne, draw_confusion_matrix
 from models.DDC.mmd import mmd_linear
 from networks.network import Extractor, Classifier, Critic, Critic2, RandomLayer, AdversarialNetwork
-from networks.inceptionv1 import InceptionV1
+from networks.inceptionv1 import InceptionV1, InceptionV1s
 
 def train_dctln(config):
-    # extractor = Extractor(n_flattens=config['n_flattens'], n_hiddens=config['n_hiddens'])
-    # classifier = Classifier(n_flattens=config['n_flattens'], n_hiddens=config['n_hiddens'], n_class=config['n_class'])
-    extractor = InceptionV1(num_classes=32)
+    if config['network'] == 'inceptionv1':
+        extractor = InceptionV1(num_classes=32, dilation=config['dilation'])
+    elif config['network'] == 'inceptionv1s':
+        extractor = InceptionV1s(num_classes=32, dilation=config['dilation'])
+    else:
+        extractor = Extractor(n_flattens=config['n_flattens'], n_hiddens=config['n_hiddens'])
     classifier = Classifier(n_flattens=config['n_flattens'], n_hiddens=config['n_hiddens'], n_class=config['n_class'])
 
     critic = Critic2(n_flattens=config['n_flattens'], n_hiddens=config['n_hiddens'])
@@ -28,7 +31,10 @@ def train_dctln(config):
     loss_class = torch.nn.CrossEntropyLoss()
     loss_domain = torch.nn.CrossEntropyLoss()
 
-    res_dir = os.path.join(config['res_dir'], 'snr{}-lr{}'.format(config['snr'], config['lr']))
+    res_dir = os.path.join(config['res_dir'], 'normal{}-{}-dilation{}-lr{}'.format(config['normal'], 
+                                                                                    config['network'],
+                                                                                    config['dilation'],
+                                                                                    config['lr']))
     if not os.path.exists(res_dir):
         os.makedirs(res_dir)
 
