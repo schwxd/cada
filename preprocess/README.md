@@ -10,7 +10,7 @@
         # 读取inner.mat, normal.mat, outer.mat三个文件，trainnumber写在了文件中
 
     服务器：
-
+        python 1-cwru.py --normal=0 --fft=1 --framesize=1200 --trainnumber=2000 --testnumber=1 --dataroot=/nas/data/cwru/de-only/c10
 
 跨故障深度：
     Windows：

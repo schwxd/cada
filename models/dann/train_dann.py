@@ -15,12 +15,12 @@ from networks.inceptionv1 import InceptionV1
 from torchsummary import summary
 
 def train_dann(config):
-    # if config['inception'] == 1:
-    #     extractor = InceptionV4(num_classes=32)
-    # else:
-    #     extractor = Extractor(n_flattens=config['n_flattens'], n_hiddens=config['n_hiddens'])
-    # classifier = Classifier(n_flattens=config['n_flattens'], n_hiddens=config['n_hiddens'], n_class=config['n_class'])
-    extractor = InceptionV1(num_classes=32)
+    if config['network'] == 'inceptionv1':
+        extractor = InceptionV1(num_classes=32, dilation=config['dilation'])
+    elif config['network'] == 'inceptionv1s':
+        extractor = InceptionV1s(num_classes=32, dilation=config['dilation'])
+    else:
+        extractor = Extractor(n_flattens=config['n_flattens'], n_hiddens=config['n_hiddens'])
     classifier = Classifier(n_flattens=config['n_flattens'], n_hiddens=config['n_hiddens'], n_class=config['n_class'])
 
     critic = Critic2(n_flattens=config['n_flattens'], n_hiddens=config['n_hiddens'])

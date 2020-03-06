@@ -154,12 +154,12 @@ def train_pada(config):
         num_iter = len_source_loader
         for step in range(1, num_iter + 1):
             data_source, label_source = iter_source.next()
-            data_target, _ = iter_target.next()
+            data_target, label_target = iter_target.next()
             if step % len_target_loader == 0:
                 iter_target = iter(config['target_train_loader'])
             if torch.cuda.is_available():
                 data_source, label_source = data_source.cuda(), label_source.cuda()
-                data_target = data_target.cuda()
+                data_target, label_target = data_target.cuda(), label_target.cuda()
 
             optimizer_t.zero_grad()
             optimizer_ad.zero_grad()
@@ -175,6 +175,8 @@ def train_pada(config):
 
             target_preds = classifier_t(h_t)
             softmax_output_t = nn.Softmax(dim=1)(target_preds)
+            if config['target_labeling'] == 1:
+                cls_loss += nn.CrossEntropyLoss()(target_preds, label_target)
 
             feature = torch.cat((h_s, h_t), 0)
             softmax_output = torch.cat((softmax_output_s, softmax_output_t), 0)
@@ -212,6 +214,9 @@ def train_pada(config):
             test(extractor_s, classifier_s, config['source_test_loader'], epoch)
             # print('test on target_test_loader')
             # accuracy = test(extractor_s, classifier_s, config['target_test_loader'], epoch)
+
+    extractor_t.load_state_dict(extractor_s.state_dict())
+    classifier_t.load_state_dict(classifier_s.state_dict())
 
     for param in extractor_s.parameters():
         param.requires_grad = False

@@ -13,19 +13,17 @@ from utils.functions import test, set_log_config
 from utils.vis import draw_tsne, draw_confusion_matrix
 from networks.network import Extractor, Classifier, Critic, Critic2, RandomLayer, AdversarialNetwork
 from networks.inceptionv4 import InceptionV4
-from networks.inceptionv1 import InceptionV1
+from networks.inceptionv1 import InceptionV1, InceptionV1s
 
 from torchsummary import summary
 
 def train_cdan_iw(config):
-    # if config['inception'] == 1:
-    #     #extractor = create_inception(1, 32, depth=4)
-    #     extractor = InceptionV4(num_classes=32)
-    # else:
-    #     extractor = Extractor(n_flattens=config['n_flattens'], n_hiddens=config['n_hiddens'])
-    # #extractor = Extractor(n_flattens=config['n_flattens'], n_hiddens=config['n_hiddens'])
-    # classifier = Classifier(n_flattens=config['n_flattens'], n_hiddens=config['n_hiddens'], n_class=config['n_class'])
-    extractor = InceptionV1(num_classes=32)
+    if config['network'] == 'inceptionv1':
+        extractor = InceptionV1(num_classes=32)
+    elif config['network'] == 'inceptionv1s':
+        extractor = InceptionV1s(num_classes=32)
+    else:
+        extractor = Extractor(n_flattens=config['n_flattens'], n_hiddens=config['n_hiddens'])
     classifier = Classifier(n_flattens=config['n_flattens'], n_hiddens=config['n_hiddens'], n_class=config['n_class'])
 
     if torch.cuda.is_available():
@@ -34,11 +32,14 @@ def train_cdan_iw(config):
         #summary(extractor, (1, 5120))
 
     cdan_random = config['random_layer'] 
-    res_dir = os.path.join(config['res_dir'], 'normal{}-lr{}'.format(config['normal'], config['lr']))
+    res_dir = os.path.join(config['res_dir'], 'normal{}-{}-dilation{}-lr{}'.format(config['normal'],
+                                                                        config['network'],
+                                                                        config['dilation'],
+                                                                        config['lr']))
     if not os.path.exists(res_dir):
         os.makedirs(res_dir)
 
-    print('train_cdan')
+    print('train_cdan_iw')
     #print(extractor)
     #print(classifier)
     print(config)
@@ -97,51 +98,40 @@ def train_cdan_iw(config):
             add code start
             """
             with torch.no_grad():
-                h_s = extractor(data_source)
-                h_s = h_s.view(h_s.size(0), -1)
-                h_t = extractor(data_target)
-                h_t = h_t.view(h_t.size(0), -1)
+                if config['models'] == 'CDAN_IW':
+                    h_s = extractor(data_source)
+                    h_s = h_s.view(h_s.size(0), -1)
+                    h_t = extractor(data_target)
+                    h_t = h_t.view(h_t.size(0), -1)
 
-                source_preds = classifier(h_s)
-                softmax_output_s = nn.Softmax(dim=1)(source_preds)
+                    source_preds = classifier(h_s)
+                    softmax_output_s = nn.Softmax(dim=1)(source_preds)
 
-                target_preds = classifier(h_t)
-                softmax_output_t = nn.Softmax(dim=1)(target_preds)
+                    target_preds = classifier(h_t)
+                    softmax_output_t = nn.Softmax(dim=1)(target_preds)
 
-                feature = torch.cat((h_s, h_t), 0)
-                softmax_output = torch.cat((softmax_output_s, softmax_output_t), 0)
+                    feature = torch.cat((h_s, h_t), 0)
+                    softmax_output = torch.cat((softmax_output_s, softmax_output_t), 0)
 
-                # op_out = torch.bmm(softmax_output.unsqueeze(2), feature.unsqueeze(1))
-                # gamma = 2 / (1 + math.exp(-10 * (epoch) / config['n_epochs'])) - 1
-                # ad_out = ad_net(op_out.view(-1, softmax_output.size(1) * feature.size(1)), gamma, training=False)
-                # dom_entropy = loss_func.Entropy(ad_out)
+                    op_out = torch.bmm(softmax_output_s.unsqueeze(2), h_s.unsqueeze(1))
+                    gamma = 2 / (1 + math.exp(-10 * (epoch) / config['n_epochs'])) - 1
+                    ad_out = ad_net(op_out.view(-1, softmax_output_s.size(1) * h_s.size(1)), gamma, training=False)
+                    dom_entropy = loss_func.Entropy(ad_out)
+                    dom_weight = dom_entropy / torch.sum(dom_entropy)
 
-                #tmp = torch.ones_like(softmax_output_s)
-                op_out = torch.bmm(softmax_output_s.unsqueeze(2), h_s.unsqueeze(1))
-                #op_out = torch.bmm(tmp.unsqueeze(2), h_s.unsqueeze(1))
-                gamma = 2 / (1 + math.exp(-10 * (epoch) / config['n_epochs'])) - 1
-                ad_out = ad_net(op_out.view(-1, softmax_output_s.size(1) * h_s.size(1)), gamma, training=False)
-                #dom_entropy = loss_func.Entropy(ad_out)
-                #dom_entropy = 1-(torch.abs(0.5-dom_entropy))**2
+                elif config['models'] == 'DANN_IW':
+                    h_s = extractor(data_source)
+                    h_s = h_s.view(h_s.size(0), -1)
+                    gamma = 2 / (1 + math.exp(-10 * (epoch) / config['n_epochs'])) - 1
+                    ad_out = ad_net(h_s, gamma, training=False)
+                    dom_entropy = 1-(torch.abs(0.5-ad_out))**2
+                    #dom_entropy = loss_func.Entropy(dom_entropy)
+                    dom_weight = dom_entropy / torch.sum(dom_entropy)
+                    if epoch % 10 == 0:
+                        print('ad_out: {}'.format(ad_out))
+                        print('dom_weight: {}'.format(dom_weight))
+                    # print('ad_out {}, dom_entropy {}'.format(ad_out.size(), dom_entropy.size()))
 
-                #dom_entropy = 1-(torch.abs(0.5-ad_out))**2
-                #dom_weight = dom_entropy
-
-                dom_entropy = 1-(torch.abs(0.5-ad_out))**2
-                #dom_entropy = loss_func.Entropy(dom_entropy)
-                dom_weight = dom_entropy / torch.sum(dom_entropy)
-              
-
-                ### dom_weight = dom_entropy / torch.sum(dom_entropy)
-
-                # print('ad_out {}, dom_entropy {}'.format(ad_out.size(), dom_entropy.size()))
-
-
-                # entropy.register_hook(grl_hook(coeff))
-                # dom_entropy = 1.0+torch.exp(-dom_entropy)
-                # dom_weight = dom_entropy / torch.sum(dom_entropy).detach().item()
-                ### dom_weight = dom_entropy / torch.sum(dom_entropy)
-                # print('ad_out {}, dom_entropy {}, dom_weight {}'.format(ad_out.size(), dom_entropy.size(), dom_weight.size()))
 
             """
             add code end
@@ -171,13 +161,13 @@ def train_cdan_iw(config):
 
             if epoch > start_epoch:
                 gamma = 2 / (1 + math.exp(-10 * (epoch) / config['n_epochs'])) - 1
-                if config['models'] == 'CDAN_IW':
+                if config['models'] == 'CDAN_EIW':
                     entropy = loss_func.Entropy(softmax_output)
                     # print('softmax_output {}, entropy {}'.format(softmax_output.size(), entropy.size()))
                     d_loss = loss_func.CDAN([feature, softmax_output], ad_net, gamma, entropy, loss_func.calc_coeff(num_iter*(epoch-start_epoch)+step), random_layer)
-                elif config['models'] == 'CDAN':
+                elif config['models'] == 'CDAN_IW':
                     d_loss = loss_func.CDAN([feature, softmax_output], ad_net, gamma, None, None, random_layer)
-                elif config['models'] == 'DANN':
+                elif config['models'] == 'DANN_IW':
                     d_loss = loss_func.DANN(feature, ad_net, gamma)
                 else:
                     raise ValueError('Method cannot be recognized.')

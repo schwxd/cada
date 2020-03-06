@@ -37,6 +37,7 @@ from models.CDAN_ICAN.train_cdan_ican import train_cdan_ican
 from models.CDAN_IW.train_cdan_iw import train_cdan_iw
 from models.DCTLN.train_dctln import train_dctln
 from models.PADA.train_pada import train_pada
+from models.dann_vat.train_dann_vat import train_dann_vat
 
 def train(config):
     if config['models'] == 'sourceonly':
@@ -65,7 +66,7 @@ def train(config):
         train_mcd_a(config)
     elif config['models'] == 'CDAN_VAT':
         train_cdan_vat(config)
-    elif config['models'] == 'CDAN_ICAN':
+    elif config['models'] in ['CDAN_ICAN', 'DANN_IW', 'DANN_EIW']:
         train_cdan_ican(config)
     elif config['models'] == 'CDAN_IW':
         train_cdan_iw(config)
@@ -73,6 +74,8 @@ def train(config):
         train_dctln(config)
     elif config['models'] == 'PADA':
         train_pada(config)
+    elif config['models'] == 'dann_vat':
+        train_dann_vat(config)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Transfer Learning')
@@ -126,6 +129,8 @@ if __name__ == "__main__":
     parser.add_argument('--mcd_swd', required=False, type=int, default=0, help='')
 
     parser.add_argument('--pada_cons_w', required=False, type=float, default=1.0, help='')
+    parser.add_argument('--slim', required=False, type=int, default=0, help='')
+    parser.add_argument('--target_labeling', required=False, type=int, default=0, help='')
 
     args = parser.parse_args()
     os.environ["CUDA_VISIBLE_DEVICES"] = args.gpu_id 
@@ -152,7 +157,7 @@ if __name__ == "__main__":
                                                                                         split=args.split, 
                                                                                         snr=args.snr, 
                                                                                         normal=args.normal,
-                                                                                        slim=1)
+                                                                                        slim=args.slim)
 
     config['models'] = args.models
     config['network'] = args.network
@@ -187,5 +192,7 @@ if __name__ == "__main__":
     config['mcd_swd'] = args.mcd_swd
 
     config['pada_cons_w'] = args.pada_cons_w
+    config['slim'] = args.slim
+    config['target_labeling'] = args.target_labeling
 
     train(config)
