@@ -62,11 +62,24 @@ def train_cdan_iw(config):
         random_layer = None
         ad_net = AdversarialNetwork(config['n_flattens'] * config['n_class'], config['n_hiddens'])
     ad_net = ad_net.cuda()
+
     optimizer = torch.optim.Adam([
         {'params': extractor.parameters(), 'lr': config['lr']},
         {'params': classifier.parameters(), 'lr': config['lr']}
         ], weight_decay=0.0001)
     optimizer_ad = torch.optim.Adam(ad_net.parameters(), lr=config['lr'], weight_decay=0.0001)
+
+    # optimizer = torch.optim.SGD([
+    #     {'params': extractor.parameters(), 'lr': config['lr']},
+    #     {'params': classifier.parameters(), 'lr': config['lr']}
+    #     ], 
+    #     lr = config['lr'], 
+    #     weight_decay = 0.0005, 
+    #     momentum = 0.9)
+    # optimizer_ad = torch.optim.SGD(ad_net.parameters(),
+    #                 lr = config['lr'], 
+    #                 weight_decay = 0.0005, 
+    #                 momentum = 0.9)
     print(ad_net)
 
     extractor_path = os.path.join(res_dir, "extractor.pth")
@@ -128,8 +141,15 @@ def train_cdan_iw(config):
                     ad_out = ad_net(op_out.view(-1, softmax_output_s.size(1) * h_s.size(1)), gamma, training=False)
                     # dom_entropy = loss_func.Entropy(ad_out)
                     dom_entropy = 1+(torch.abs(0.5-ad_out))**config['iw']
+                    # print('ad_out {}, dom_entropy {}'.format(ad_out, dom_entropy))
+                    # print('ad_out {}, dom_entropy {}'.format(ad_out.shape, dom_entropy.shape))
                     # dom_weight = dom_entropy / torch.sum(dom_entropy)
                     dom_weight = dom_entropy
+                    # if step == 1:
+                    #     print('ad_out {}'.format(ad_out))
+                    #     print('dom_entropy {}'.format(dom_entropy))
+                    #     print('dom_weight sum {}'.format(torch.sum(dom_weight)))
+
 
                 elif config['models'] == 'DANN_IW':
                     h_s = extractor(data_source)
@@ -140,8 +160,14 @@ def train_cdan_iw(config):
                     # dom_entropy = 1-((torch.abs(0.5-ad_out))**config['iw'])
                     # dom_weight = dom_entropy
                     dom_weight = torch.ones(ad_out.shape).cuda()
+
                     #dom_entropy = loss_func.Entropy(dom_entropy)
                     # dom_weight = dom_entropy / torch.sum(dom_entropy)
+                    # if epoch % 10 == 0:
+                    #     print('ad_out: {}'.format(ad_out))
+                    #     print('dom_weight: {}'.format(dom_weight))
+                    #     print('dom_weight sum {}'.format(torch.sum(dom_weight)))
+                    # print('ad_out {}, dom_entropy {}'.format(ad_out.size(), dom_entropy.size()))
 
 
             """
@@ -165,8 +191,20 @@ def train_cdan_iw(config):
             feature = torch.cat((h_s, h_t), 0)
             softmax_output = torch.cat((softmax_output_s, softmax_output_t), 0)
 
+            # cls_loss = nn.CrossEntropyLoss()(source_preds, label_source)
             cls_loss = nn.CrossEntropyLoss(reduction='none')(source_preds, label_source)
+            # torch.sum(weight.view(-1, 1) * nn.BCELoss(reduction='none')(ad_out, dc_target)) / torch.sum(weight).detach().item()
+            # print('cls_loss type {}, {}'.format(type(cls_loss), cls_loss.size()))
+            # if step == 1:
+            #     print('cls_loss {}'.format(cls_loss))
+            #     print('cls_loss shape {}'.format(cls_loss.shape))
+            # cls_loss = torch.sum(dom_weight.view(-1, 1) * cls_loss) / torch.sum(dom_weight).detach().item()
+            # cls_loss = torch.sum(dom_weight.view(-1, 1) * cls_loss) / torch.sum(cls_loss).detach().item()
             cls_loss = torch.mean(dom_weight * cls_loss)
+
+            # if step == 1:
+            #     print('after reweight, cls_loss {}'.format(cls_loss))
+            #     print('cls_loss shape {}'.format(cls_loss.shape))
 
             if epoch > start_epoch:
                 gamma = 2 / (1 + math.exp(-10 * (epoch) / config['n_epochs'])) - 1
@@ -183,36 +221,61 @@ def train_cdan_iw(config):
             else:
                 d_loss = 0
 
+            #coral
+            # coral_loss = CORAL(h_s, h_t)
+
+
+
             loss = cls_loss + d_loss
+            # loss = cls_loss + d_loss + gamma * coral_loss
             loss.backward()
             optimizer.step()
             if epoch > start_epoch:
                 optimizer_ad.step()
-            if (step) % 20 == 0:
-                print('Train Epoch {} closs {:.6f}, dloss {:.6f}, Loss {:.6f}'.format(epoch, cls_loss.item(), d_loss.item(), loss.item()))
+            # if (step) % 20 == 0:
+                # print('Train Epoch {} closs {:.6f}, dloss {:.6f}, coral_loss {:.6f}, Loss {:.6f}'.format(epoch, cls_loss.item(), d_loss.item(), coral_loss.item(), loss.item()))
+                # print('Train Epoch {} closs {:.6f}, dloss {:.6f}, Loss {:.6f}'.format(epoch, cls_loss.item(), d_loss.item(), loss.item()))
 
-    best_accuracy = 0
-    best_model_index = -1
-    for epoch in range(1, config['n_epochs'] + 1):
-        train(extractor, classifier, ad_net, config, epoch)
-        if epoch % config['TEST_INTERVAL'] == 0:
+    if config['testonly'] == 0:
+        best_accuracy = 0
+        best_model_index = -1
+        for epoch in range(1, config['n_epochs'] + 1):
+            train(extractor, classifier, ad_net, config, epoch)
+            if epoch % config['TEST_INTERVAL'] == 0:
+                # print('test on source_test_loader')
+                # test(extractor, classifier, config['source_test_loader'], epoch)
+                print('test on target_test_loader')
+                accuracy = test(extractor, classifier, config['target_test_loader'], epoch)
+
+                if accuracy > best_accuracy:
+                    best_accuracy = accuracy
+                    best_model_index = epoch
+                    torch.save(extractor.state_dict(), extractor_path)
+                    torch.save(classifier.state_dict(), classifier_path)
+                    torch.save(ad_net.state_dict(), adnet_path)
+                print('epoch {} accuracy: {:.6f}, best accuracy {:.6f} on epoch {}'.format(epoch, accuracy, best_accuracy, best_model_index))
+
+
+            if epoch % config['VIS_INTERVAL'] == 0:
+                title = config['models']
+                draw_confusion_matrix(extractor, classifier, config['target_test_loader'], res_dir, epoch, title)
+                draw_tsne(extractor, classifier, config['source_train_loader'], config['target_test_loader'], res_dir, epoch, title, separate=True)
+                draw_tsne(extractor, classifier, config['source_train_loader'], config['target_test_loader'], res_dir, epoch, title, separate=False)
+    else:
+        if os.path.exists(extractor_path) and os.path.exists(classifier_path) and os.path.exists(adnet_path):
+            extractor.load_state_dict(torch.load(extractor_path))
+            classifier.load_state_dict(torch.load(classifier_path))
+            ad_net.load_state_dict(torch.load(adnet_path))
+            print('Test only mode, model loaded')
+
             # print('test on source_test_loader')
-            # test(extractor, classifier, config['source_test_loader'], epoch)
+            # test(extractor, classifier, config['source_test_loader'], -1)
             print('test on target_test_loader')
-            accuracy = test(extractor, classifier, config['target_test_loader'], epoch)
+            test(extractor, classifier, config['target_test_loader'], -1)
 
-            if accuracy > best_accuracy:
-                best_accuracy = accuracy
-                best_model_index = epoch
-                torch.save(extractor.state_dict(), extractor_path)
-                torch.save(classifier.state_dict(), classifier_path)
-                torch.save(ad_net.state_dict(), adnet_path)
-            print('epoch {} accuracy: {:.6f}, best accuracy {:.6f} on epoch {}'.format(epoch, accuracy, best_accuracy, best_model_index))
-
-
-        if epoch % config['VIS_INTERVAL'] == 0:
             title = config['models']
-            draw_confusion_matrix(extractor, classifier, config['target_test_loader'], res_dir, epoch, title)
-            draw_tsne(extractor, classifier, config['source_train_loader'], config['target_test_loader'], res_dir, epoch, title, separate=True)
-            draw_tsne(extractor, classifier, config['source_train_loader'], config['target_test_loader'], res_dir, epoch, title, separate=False)
+            draw_confusion_matrix(extractor, classifier, config['target_test_loader'], res_dir, -1, title)
+            # draw_tsne(extractor, classifier, config['source_test_loader'], config['target_test_loader'], res_dir, -1, title, separate=True)
+        else:
+            print('no saved model found')
 

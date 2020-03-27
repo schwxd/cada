@@ -6,43 +6,38 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 
-import models.CDAN.cdan_loss as loss_func
+import models.CDAN_VAT.cdan_loss as loss_func
+from models.CDAN_VAT.vat import VirtualAdversarialPerturbationGenerator
+from models.CDAN_VAT.consistency_losses import KLDivLossWithLogits
 
 from networks.network import Extractor, Classifier, Critic, Critic2, RandomLayer, AdversarialNetwork
-from networks.resnet18_1d import resnet18_features
-from networks.inceptionv4 import InceptionV4
-from networks.inceptionv1 import InceptionV1, InceptionV1s
 
-from torchsummary import summary
 from utils.functions import test, set_log_config
 from utils.vis import draw_tsne, draw_confusion_matrix
 
+target_consistency_criterion = KLDivLossWithLogits(reduction='batchmean')
+target_vat_loss_weight = 0.01
 
-def train_cdan(config):
-    if config['network'] == 'inceptionv1':
-        extractor = InceptionV1(num_classes=32)
-    elif config['network'] == 'inceptionv1s':
-        extractor = InceptionV1s(num_classes=32)
-    else:
-        extractor = Extractor(n_flattens=config['n_flattens'], n_hiddens=config['n_hiddens'], bn=config['bn'])
-
+def train_cdan_vat(config):
+    extractor = Extractor(n_flattens=config['n_flattens'], n_hiddens=config['n_hiddens'])
     classifier = Classifier(n_flattens=config['n_flattens'], n_hiddens=config['n_hiddens'], n_class=config['n_class'])
-
     if torch.cuda.is_available():
         extractor = extractor.cuda()
         classifier = classifier.cuda()
 
+    xi = 1e-06
+    ip = 1
+    eps = 15
+    vat = VirtualAdversarialPerturbationGenerator(extractor, classifier, xi=xi, eps=eps, ip=ip)
+
     cdan_random = config['random_layer'] 
-    res_dir = os.path.join(config['res_dir'], 'normal{}-{}-dilation{}-lr{}'.format(config['normal'],
-                                                                        config['network'],
-                                                                        config['dilation'],
-                                                                        config['lr']))
+    res_dir = os.path.join(config['res_dir'], 'random{}-bs{}-lr{}'.format(cdan_random, config['batch_size'], config['lr']))
     if not os.path.exists(res_dir):
         os.makedirs(res_dir)
 
     print('train_cdan')
-    #print(extractor)
-    #print(classifier)
+    print(extractor)
+    print(classifier)
     print(config)
 
     set_log_config(res_dir)
@@ -87,12 +82,12 @@ def train_cdan(config):
         num_iter = len_source_loader
         for step in range(1, num_iter + 1):
             data_source, label_source = iter_source.next()
-            data_target, label_target = iter_target.next()
+            data_target, _ = iter_target.next()
             if step % len_target_loader == 0:
                 iter_target = iter(config['target_train_loader'])
             if torch.cuda.is_available():
                 data_source, label_source = data_source.cuda(), label_source.cuda()
-                data_target, label_target = data_target.cuda(), label_target.cuda()
+                data_target = data_target.cuda()
 
             optimizer.zero_grad()
             optimizer_ad.zero_grad()
@@ -108,8 +103,6 @@ def train_cdan(config):
 
             target_preds = classifier(h_t)
             softmax_output_t = nn.Softmax(dim=1)(target_preds)
-            if config['target_labeling'] == 1:
-                cls_loss += nn.CrossEntropyLoss()(target_preds, label_target)
 
             feature = torch.cat((h_s, h_t), 0)
             softmax_output = torch.cat((softmax_output_s, softmax_output_t), 0)
@@ -123,6 +116,20 @@ def train_cdan(config):
                     d_loss = loss_func.CDAN([feature, softmax_output], ad_net, gamma, None, None, random_layer)
                 elif config['models'] == 'DANN':
                     d_loss = loss_func.DANN(feature, ad_net, gamma)
+                elif config['models'] == 'CDAN_VAT':
+                    # entropy = loss_func.Entropy(softmax_output)
+                    # d_loss = loss_func.CDAN([feature, softmax_output], ad_net, gamma, entropy, loss_func.calc_coeff(num_iter*(epoch-start_epoch)+step), random_layer)
+                    d_loss = loss_func.CDAN([feature, softmax_output], ad_net, gamma, None, None, random_layer)
+
+                    # vat_loss = loss_func.VAT(vat, data_target, extractor, classifier, target_consistency_criterion)
+
+                    # vat_adv, clean_vat_logits = vat(data_target)
+                    # vat_adv_inputs = data_target + vat_adv
+                    # adv_vat_features = extractor(vat_adv_inputs)
+                    # adv_vat_logits = classifier(adv_vat_features)
+                    # target_vat_loss = target_consistency_criterion(adv_vat_logits, clean_vat_logits)
+                    # vat_loss = target_vat_loss_weight * target_vat_loss
+
                 else:
                     raise ValueError('Method cannot be recognized.')
             else:
@@ -131,10 +138,20 @@ def train_cdan(config):
             loss = cls_loss + d_loss
             loss.backward()
             optimizer.step()
+
+            vat_adv, clean_vat_logits = vat(data_target)
+            vat_adv_inputs = data_target + vat_adv
+            adv_vat_features = extractor(vat_adv_inputs)
+            adv_vat_logits = classifier(adv_vat_features)
+            target_vat_loss = target_consistency_criterion(adv_vat_logits, clean_vat_logits)
+            vat_loss = target_vat_loss_weight * target_vat_loss
+            vat_loss.backward()
+            # optimizer.step()
+
             if epoch > start_epoch:
                 optimizer_ad.step()
             if (step) % 20 == 0:
-                print('Train Epoch {} closs {:.6f}, dloss {:.6f}, Loss {:.6f}'.format(epoch, cls_loss.item(), d_loss.item(), loss.item()))
+                print('Train Epoch {} closs {:.6f}, dloss {:.6f}, vat_loss {:.6f}, Loss {:.6f}'.format(epoch, cls_loss.item(), d_loss.item(), vat_loss.item(), loss.item()))
 
     if config['testonly'] == 0:
         best_accuracy = 0
@@ -142,8 +159,8 @@ def train_cdan(config):
         for epoch in range(1, config['n_epochs'] + 1):
             train(extractor, classifier, ad_net, config, epoch)
             if epoch % config['TEST_INTERVAL'] == 0:
-                # print('test on source_test_loader')
-                # test(extractor, classifier, config['source_test_loader'], epoch)
+                print('test on source_test_loader')
+                test(extractor, classifier, config['source_test_loader'], epoch)
                 print('test on target_test_loader')
                 accuracy = test(extractor, classifier, config['target_test_loader'], epoch)
 
@@ -159,7 +176,7 @@ def train_cdan(config):
             if epoch % config['VIS_INTERVAL'] == 0:
                 title = config['models']
                 draw_confusion_matrix(extractor, classifier, config['target_test_loader'], res_dir, epoch, title)
-                draw_tsne(extractor, classifier, config['source_train_loader'], config['target_test_loader'], res_dir, epoch, title, separate=True)
+                draw_tsne(extractor, classifier, config['source_test_loader'], config['target_test_loader'], res_dir, epoch, title, separate=True)
                 # draw_tsne(extractor, classifier, config['source_test_loader'], config['target_test_loader'], res_dir, epoch, title, separate=False)
     else:
         if os.path.exists(extractor_path) and os.path.exists(classifier_path) and os.path.exists(adnet_path):
@@ -168,15 +185,14 @@ def train_cdan(config):
             ad_net.load_state_dict(torch.load(adnet_path))
             print('Test only mode, model loaded')
 
-            # print('test on source_test_loader')
-            # test(extractor, classifier, config['source_test_loader'], -1)
+            print('test on source_test_loader')
+            test(extractor, classifier, config['source_test_loader'], -1)
             print('test on target_test_loader')
             test(extractor, classifier, config['target_test_loader'], -1)
 
             title = config['models']
             draw_confusion_matrix(extractor, classifier, config['target_test_loader'], res_dir, -1, title)
-            # draw_tsne(extractor, classifier, config['source_test_loader'], config['target_test_loader'], res_dir, -1, title, separate=True)
-            draw_tsne(extractor, classifier, config['source_train_loader'], config['target_test_loader'], res_dir, -1, title, separate=True)
+            draw_tsne(extractor, classifier, config['source_test_loader'], config['target_test_loader'], res_dir, -1, title, separate=True)
         else:
             print('no saved model found')
 

@@ -8,13 +8,11 @@ import torch.optim as optim
 
 from utils.functions import test, set_log_config, ReverseLayerF
 from utils.vis import draw_tsne, draw_confusion_matrix
+from models.DDC.mmd import mmd_linear
 from networks.network import Extractor, Classifier, Critic, Critic2, RandomLayer, AdversarialNetwork
-from networks.inceptionv4 import InceptionV4
 from networks.inceptionv1 import InceptionV1, InceptionV1s
 
-from torchsummary import summary
-
-def train_dann(config):
+def train_dctln(config):
     if config['network'] == 'inceptionv1':
         extractor = InceptionV1(num_classes=32, dilation=config['dilation'])
     elif config['network'] == 'inceptionv1s':
@@ -33,7 +31,10 @@ def train_dann(config):
     loss_class = torch.nn.CrossEntropyLoss()
     loss_domain = torch.nn.CrossEntropyLoss()
 
-    res_dir = os.path.join(config['res_dir'], 'snr{}-lr{}'.format(config['snr'], config['lr']))
+    res_dir = os.path.join(config['res_dir'], 'normal{}-{}-dilation{}-lr{}'.format(config['normal'], 
+                                                                                    config['network'],
+                                                                                    config['dilation'],
+                                                                                    config['lr']))
     if not os.path.exists(res_dir):
         os.makedirs(res_dir)
 
@@ -83,8 +84,14 @@ def train_dann(config):
 
             optimizer.zero_grad()
 
+            source = extractor(data_source)
+            source = source.view(source.size(0), -1)
+            target = extractor(data_target)
+            target = target.view(target.size(0), -1)
+            loss_mmd = mmd_linear(source, target)
+
+
             class_output_s, domain_output, _ = dann(input_data=data_source, alpha=gamma)
-            #class_output_s, domain_output, _ = dann(input_data=data_source, alpha=0.5)
             # print('domain_output {}'.format(domain_output.size()))
             err_s_label = loss_class(class_output_s, label_source)
             domain_label = torch.zeros(data_source.size(0)).long().cuda()
@@ -93,12 +100,11 @@ def train_dann(config):
             # Training model using target data
             domain_label = torch.ones(data_target.size(0)).long().cuda()
             class_output_t, domain_output, _ = dann(input_data=data_target, alpha=gamma)
-            #class_output_t, domain_output, _ = dann(input_data=data_target, alpha=0.5)
             err_t_domain = loss_domain(domain_output, domain_label)
-            err = err_s_label + err_s_domain + err_t_domain
+            err = err_s_label + err_s_domain + err_t_domain + loss_mmd
 
             if i % 20 == 0:
-                print('err_s_label {}, err_s_domain {}, gamma {}, err_t_domain {}, total err {}'.format(err_s_label.item(), err_s_domain.item(), gamma, err_t_domain.item(), err.item()))
+                print('err_s_label {}, err_s_domain {}, gamma {}, err_t_domain {}, loss_mmd {}, total err {}'.format(err_s_label.item(), err_s_domain.item(), gamma, err_t_domain.item(), loss_mmd.item(), err.item()))
 
             err.backward()
             optimizer.step()
@@ -114,4 +120,4 @@ def train_dann(config):
         if epoch % config['VIS_INTERVAL'] == 0:
             draw_confusion_matrix(extractor, classifier, config['target_test_loader'], res_dir, epoch, config['models'])
             draw_tsne(extractor, classifier, config['source_train_loader'], config['target_test_loader'], res_dir, epoch, config['models'], separate=True)
-            draw_tsne(extractor, classifier, config['source_train_loader'], config['target_test_loader'], res_dir, epoch, config['models'], separate=False)
+            # draw_tsne(extractor, classifier, config['source_test_loader'], config['target_test_loader'], res_dir, epoch, config['models'], separate=False)

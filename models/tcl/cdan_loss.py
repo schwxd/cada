@@ -55,3 +55,9 @@ def DANN(features, ad_net, gamma=1):
     batch_size = ad_out.size(0) // 2
     dc_target = torch.from_numpy(np.array([[1]] * batch_size + [[0]] * batch_size)).float().cuda()
     return nn.BCELoss()(ad_out, dc_target)
+
+def DANN_logits(features, ad_net, gamma=1):
+    ad_out = ad_net(features, gamma)
+    batch_size = ad_out.size(0) // 2
+    dc_target = torch.from_numpy(np.array([[1]] * batch_size + [[0]] * batch_size)).float().cuda()
+    return ad_out, nn.BCELoss()(ad_out, dc_target)

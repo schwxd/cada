@@ -1,4 +1,9 @@
 """
+python 5-pb-c3.py --dataroot=D:\fault\paderborn_dataset --fft=0 --train=0 --normal=2 
+python 5-pb-c3.py --dataroot=D:\fault\paderborn_dataset --fft=0 --train=1 --normal=2 
+
+python 5-pb-c3.py --dataroot=/nas/data/paderborn-raw --fft=0 --train=0 --normal=2 
+python 5-pb-c3.py --dataroot=/nas/data/paderborn-raw --fft=0 --train=1 --normal=2 
 """
 
 import os
@@ -22,18 +27,17 @@ parser.add_argument('--framesize', type=int, required=False, default=FRAME_SIZE,
 parser.add_argument('--stepsize', type=int, required=False, default=STEP_SIZE, help='Step Size of Sliding window')
 parser.add_argument('--load', type=int, required=False, default=-1, help='Specify one of the load conditions (0/1/2/3). -1 = all')
 parser.add_argument('--fft', required=False, type=int, default=0, help='use fft or not')
+parser.add_argument('--train', type=int, required=False, default=1, help='training dataset or testing dataset')
 parser.add_argument('--normal', required=False, type=int, default=0, help='normal or not')
 args = parser.parse_args()
 
+# def load_matfile(filepath, filename, frame_size=args.framesize, step_size=args.stepsize):
 def load_matfile(filepath, filename):
     """ 加载mat文件，按照FRAME_SIZE划分成序列
     """
-    matlab_file = scipy.io.loadmat(filepath)
+    matlab_file = scipy.io.loadmat(filepath)[filename]
 
-    # features = matlab_file[0][0][2][0][6][2][0]  #Take out the data
-    features = matlab_file['axout']
-
-    features = features[:, 0]
+    features = matlab_file[0][0][2][0][6][2][0]  #Take out the data
 
     # print('filename {}, feature shape {}'.format(filename, features.shape))
     return features
@@ -59,31 +63,50 @@ def feature_segment(filename, matdata, framesize, samplenumber):
     return sample_tensor
 
 labels_map = {
-    'IR007': 0,
-    'IR014': 0,
-    'IR021': 0,
-    'OR007': 1,
-    'OR014': 1,
-    'OR021': 1,
-    'Normal': 2}
+    "K001": 0,
+    "K002": 0,
+    "K003": 0,
+    "K004": 0,
+    "K005": 0,
+    "KA04": 1,
+    "KA15": 1,
+    "KA16": 1,
+    "KA22": 1,
+    "KA30": 1,
+    "KI14": 2,
+    "KI16": 2,
+    "KI17": 2,
+    "KI18": 2,
+    "KI21": 2}
 
 loads_map = {
-    'IR007': 0,
-    'IR014': 0,
-    'IR021': 0,
-    'OR007': 0,
-    'OR014': 0,
-    'OR021': 0,
-    'Normal': 0}
+    'N15_M07_F10' : 0,
+    'N09_M07_F10' : 1,
+    'N15_M01_F10' : 2,
+    'N15_M07_F04' : 3
+}
 
 frames_per_class = {
-    'IR007': 1000,
-    'IR014': 1000,
-    'IR021': 1000,
-    'OR007': 1000,
-    'OR014': 1000,
-    'OR021': 1000,
-    'Normal': 3000}
+    "K002": 240,
+    "KA01": 60,
+    "KA05": 60,
+    "KA07": 60,
+    "KI01": 60,
+    "KI03": 60,
+    "KI05": 60,
+    "KI07": 60,
+    
+    "K001": 240,
+    "KA04": 60,
+    "KA15": 60,
+    "KA16": 60,
+    "KA22": 60,
+    "KA30": 60,
+    "KI14": 60,
+    "KI16": 60,
+    "KI17": 60,
+    "KI18": 60,
+    "KI21": 60}
 
 
 def get_labels_and_loads(filelist, labels_map, loads_map):
@@ -96,8 +119,12 @@ def get_labels_and_loads(filelist, labels_map, loads_map):
     labels_list = []
     loads_list = []
     for filename in filelist:
-        labels_list.append(labels_map[filename])
-        loads_list.append(loads_map[filename])
+        load = filename[:11]
+        label = filename[12:16]
+        # print('filename {}, load {}, label {}'.format(filename, load, label))
+
+        labels_list.append(labels_map[label])
+        loads_list.append(loads_map[load])
     return loads_list, labels_list
 
 def calculate_frames_per_class(filename):
@@ -129,7 +156,8 @@ def load_files_from_list(filepaths, filenames, labels_map, loads_map, framesize)
         matdata = load_matfile(filepath, filename)
 
         # 查询该文件应该生成多少个样本
-        n_samples = calculate_frames_per_class(filename)
+        # n_samples = calculate_frames_per_class(filename)
+        n_samples = 1200
 
         # 生成长度为framesize，总数为n_samples的样本特征
         features = feature_segment(filename, matdata, framesize, samplenumber=n_samples)
@@ -179,27 +207,38 @@ if __name__ == '__main__':
     filepaths = []  # 文件路径
     filenames = []  # 去掉后缀的文件名
     subdirs = []
-
-    for filename in os.listdir(args.dataroot):
-        if not filename.endswith('.mat'):
+    for roots, dirs, files in os.walk(args.dataroot):
+        # 遍历文件夹，看是否需要读取该文件夹
+        hits = False
+        for key in labels_map.keys():
+            if key in roots:
+                hits = True
+                print('subdir {} matchs'.format(roots))
+        if not hits:
+            print('roots {} not in the list {}'.format(roots, labels_map.keys()))
             continue
-        filenames.append(filename[:-4])
-        filepaths.append(os.path.join(args.dataroot, filename))
+
+        for filename in files:
+            if not filename.endswith('.mat'):
+                continue
+            filenames.append(filename[:-4])
+            filepaths.append(os.path.join(roots, filename))
+            subdirs.append(roots)
 
     print('filepaths len {}'.format(len(filepaths)))
     total_features, total_labels, labels_dict, labels_list = load_files_from_list(filepaths, filenames, labels_map, loads_map, framesize=args.framesize)
 
-    #print('total_features {}'.format(total_features.keys()))
-    #print('total_labels {}'.format(total_labels.keys()))
-    #print('labels_dict {}'.format(labels_dict))
-    #print('labels_list {}'.format(labels_list))
+    print('total_features {}'.format(total_features.keys()))
+    print('total_labels {}'.format(total_labels.keys()))
+    print('labels_dict {}'.format(labels_dict))
+    print('labels_list {}'.format(labels_list))
     
     features_prune = {}
     labels_prune = {}
     features_prune_test = {}
     labels_prune_test = {}
     for load in total_features.keys():
-        res_dir = "./data/simulink_fft{}_frame{}/load{}".format(args.fft, args.framesize, load)
+        res_dir = "./data/paderborn_train{}_fft{}_frame{}/load{}".format(args.train, args.fft, args.framesize, load)
         if not os.path.exists(res_dir):
             os.makedirs(res_dir)
 

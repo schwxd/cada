@@ -55,3 +55,25 @@ def DANN(features, ad_net, gamma=1):
     batch_size = ad_out.size(0) // 2
     dc_target = torch.from_numpy(np.array([[1]] * batch_size + [[0]] * batch_size)).float().cuda()
     return nn.BCELoss()(ad_out, dc_target)
+
+
+from models.CDAN_VAT.consistency_losses import KLDivLossWithLogits
+from models.CDAN_VAT.utils import disable_tracking_bn_stats
+
+
+def VAT(vat, target_inputs, feature_extractor, classifier, target_consistency_criterion):
+    # VAT
+    vat_adv, clean_vat_logits = vat(target_inputs)
+    vat_adv_inputs = target_inputs + vat_adv
+
+    with disable_tracking_bn_stats(feature_extractor):
+        with disable_tracking_bn_stats(classifier):
+            adv_vat_features = feature_extractor(vat_adv_inputs)
+            adv_vat_logits = classifier(adv_vat_features)
+
+    target_vat_loss = target_consistency_criterion(adv_vat_logits, clean_vat_logits)
+
+    return target_vat_loss
+    # target_vat_loss.backward()
+    # feature_extractor_grads = self.feature_extractor.module.stash_grad(feature_extractor_grads)
+    # classifier_grads = self.classifier.module.stash_grad(feature_extractor_grads)
