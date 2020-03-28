@@ -91,6 +91,7 @@ if __name__ == "__main__":
     parser.add_argument('--dilation', type=int, required=False, default=1, help='')
 
     parser.add_argument('--snr', type=int, required=False, default=0, help='')
+    parser.add_argument('--snrp', type=float, required=False, default=0, help='')
     parser.add_argument('--testonly', type=int, required=False, default=0, help='')
     parser.add_argument('--split', type=float, required=False, default=0.5, help='')
     parser.add_argument('--inception', type=int, required=False, default=0, help='')
@@ -158,13 +159,15 @@ if __name__ == "__main__":
                                                                                         trainonly=False, 
                                                                                         split=0.8, 
                                                                                         snr=args.snr, 
+                                                                                        snrp=args.snrp,
                                                                                         normal=args.normal,
                                                                                         slim=args.slim)
     config['target_train_loader'], config['target_test_loader'], _ = get_raw_1d(tgt_dataset, 
                                                                                         batch_size=args.batch_size, 
                                                                                         trainonly=False, 
                                                                                         split=args.split, 
-                                                                                        snr=args.snr, 
+                                                                                        snr=0,
+                                                                                        snrp=0,
                                                                                         normal=args.normal,
                                                                                         slim=0)
 
@@ -182,6 +185,7 @@ if __name__ == "__main__":
     config['TEST_INTERVAL'] = args.TEST_INTERVAL
     config['VIS_INTERVAL'] = args.VIS_INTERVAL
     config['snr'] = args.snr
+    config['snrp'] = args.snrp
     config['normal'] = args.normal
     config['inception'] = args.inception
     config['aux_classifier'] = args.aux_classifier

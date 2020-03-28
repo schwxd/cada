@@ -33,9 +33,9 @@ def train_cdan(config):
         classifier = classifier.cuda()
 
     cdan_random = config['random_layer'] 
-    res_dir = os.path.join(config['res_dir'], 'normal{}-{}-dilation{}-lr{}'.format(config['normal'],
-                                                                        config['network'],
-                                                                        config['dilation'],
+    res_dir = os.path.join(config['res_dir'], 'slim{}-snr{}-snrp{}-lr{}'.format(config['slim'],
+                                                                        config['snr'],
+                                                                        config['snrp'],
                                                                         config['lr']))
     if not os.path.exists(res_dir):
         os.makedirs(res_dir)

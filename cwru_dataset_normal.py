@@ -15,16 +15,22 @@ def wgn(x, snr):
 
 
 class BearingDataset(data.Dataset):
-    def __init__(self, features, labels, transform, snr=0):
+    def __init__(self, features, labels, transform, snr=0, snrp=0):
         self.features = features
         self.labels = labels
         self.transform = transform
 
-        if snr != 0:
-            print('apply snr {} to signal'.format(snr))
+        if snr != 0 and snrp != 0:
+            print('apply noise with probability of {} and level {} to signal'.format(snrp, snr))
+            idxs = int(np.floor(len(features) * snrp))
+            with_noise = np.ones(idxs)
+            without_noise = np.zeros(len(features)-idxs)
+            snr_weights = np.concatenate((with_noise, without_noise))
+            np.random.shuffle(snr_weights)
             for i in range(len(self.features)):
-                noise = wgn(self.features[i], snr)
-                self.features[i] += noise
+                if snr_weights[i] == 1:
+                    noise = wgn(self.features[i], snr)
+                    self.features[i] += noise
 
     def __len__(self):
         return len(self.features)
@@ -57,7 +63,7 @@ class Normalize(object):
         return seq
 
 
-def get_raw_1d(rootdir, batch_size, trainonly=False, split=0.5, snr=0, normal=0, slim=0):
+def get_raw_1d(rootdir, batch_size, trainonly=False, split=0.5, snr=0, snrp=0, normal=0, slim=0):
 
     data = np.load(os.path.join(rootdir, 'data_features_train.npy')).astype(np.float32)
     labels = np.load(os.path.join(rootdir, 'data_labels_train.npy')).astype(np.uint8)
@@ -89,7 +95,7 @@ def get_raw_1d(rootdir, batch_size, trainonly=False, split=0.5, snr=0, normal=0,
         # 全部数据用于训练集
         train_features = data[:, np.newaxis, :]
         train_labels = labels
-        train_dataset = BearingDataset(train_features, train_labels, transform=pre_process)
+        train_dataset = BearingDataset(train_features, train_labels, transform=pre_process, snr=snr, snrp=snrp)
 
     else:
         # 将数据切分为训练集和测试集，切分比例按照参数split
@@ -127,7 +133,7 @@ def get_raw_1d(rootdir, batch_size, trainonly=False, split=0.5, snr=0, normal=0,
             train_labels_slim = np.concatenate(train_labels_slim, axis=0)
             print('selected class: {}'.format(selected))
             print('train_features_slim {}, train_labels_slim {}'.format(train_features_slim.shape, train_labels_slim.shape))
-            train_dataset = BearingDataset(train_features_slim, train_labels_slim, transform=pre_process)
+            train_dataset = BearingDataset(train_features_slim, train_labels_slim, transform=pre_process, snr=snr, snrp=snrp)
 
         elif slim == 2:
             # 只保留healthy，类标是6
@@ -138,7 +144,7 @@ def get_raw_1d(rootdir, batch_size, trainonly=False, split=0.5, snr=0, normal=0,
             train_features_slim = train_features[train_labels == selected]
             print('selected class: {}'.format(selected))
             print('train_features_slim {}, train_labels_slim {}'.format(train_features_slim.shape, train_labels_slim.shape))
-            train_dataset = BearingDataset(train_features_slim, train_labels_slim, transform=pre_process)
+            train_dataset = BearingDataset(train_features_slim, train_labels_slim, transform=pre_process, snr=snr, snrp=snrp)
 
         elif slim == 9:
             n_class = len(np.unique(train_labels))
@@ -157,11 +163,11 @@ def get_raw_1d(rootdir, batch_size, trainonly=False, split=0.5, snr=0, normal=0,
             print('labels_with_noise {}'.format(labels_with_noise[:20]))
             # print(labels_with_noise[:20]-labels[:20])
             labels_with_noise = np.uint8(labels_with_noise)
-            train_dataset = BearingDataset(train_features, labels_with_noise, transform=pre_process)
+            train_dataset = BearingDataset(train_features, labels_with_noise, transform=pre_process, snr=snr, snrp=snrp)
         else:
-            train_dataset = BearingDataset(train_features, train_labels, transform=pre_process)
+            train_dataset = BearingDataset(train_features, train_labels, transform=pre_process, snr=snr, snrp=snrp)
 
-        test_dataset = BearingDataset(test_features, test_labels, transform=pre_process)
+        test_dataset = BearingDataset(test_features, test_labels, transform=pre_process, snr=snr, snrp=snrp)
 
     train_loader = torch.utils.data.DataLoader(
         dataset=train_dataset,

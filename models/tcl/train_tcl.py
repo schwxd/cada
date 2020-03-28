@@ -31,8 +31,9 @@ def train_tcl(config):
         classifier = classifier.cuda()
         #summary(extractor, (1, 5120))
 
-    res_dir = os.path.join(config['res_dir'], 'slim{}-{}-Lythred{}-Ldthred{}-lambdad{}-lr{}'.format(config['slim'],
-                                                                        config['network'],
+    res_dir = os.path.join(config['res_dir'], 'slim{}-snr{}-snrp{}-Lythred{}-Ldthred{}-lambdad{}-lr{}'.format(config['slim'],
+                                                                        config['snr'],
+                                                                        config['snrp'],
                                                                         config['Lythred'],
                                                                         config['Ldthred'],
                                                                         config['lambdad'],

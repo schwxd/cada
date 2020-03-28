@@ -29,8 +29,9 @@ def train_cnn(config):
         extractor = extractor.cuda()
         classifier = classifier.cuda()
 
-    res_dir = os.path.join(config['res_dir'], 'normal{}-{}-lr{}'.format(config['normal'], 
-                                                                        config['network'],
+    res_dir = os.path.join(config['res_dir'], 'slim{}-snr{}-snrp{}-lr{}'.format(config['slim'], 
+                                                                        config['snr'],
+                                                                        config['snrp'],
                                                                         config['lr']))
     if not os.path.exists(res_dir):
         os.makedirs(res_dir)
