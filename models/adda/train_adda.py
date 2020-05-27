@@ -9,17 +9,23 @@ import torch.optim as optim
 from networks.network import Extractor, Classifier, Critic, Critic2, RandomLayer, AdversarialNetwork
 from utils.functions import test, set_log_config, set_requires_grad
 from utils.vis import draw_tsne, draw_confusion_matrix
+from networks.inceptionv4 import InceptionV4
+from networks.inceptionv1 import InceptionV1, InceptionV1s
 
 def train_adda(config):
+    if config['network'] == 'inceptionv1':
+        extractor = InceptionV1(num_classes=32)
+    elif config['network'] == 'inceptionv1s':
+        extractor = InceptionV1s(num_classes=32)
+    else:
+        extractor = Extractor(n_flattens=config['n_flattens'], n_hiddens=config['n_hiddens'], bn=config['bn'])
+    classifier = Classifier(n_flattens=config['n_flattens'], n_hiddens=config['n_hiddens'], n_class=config['n_class'])
 
     criterion = torch.nn.CrossEntropyLoss()
     loss_class = torch.nn.CrossEntropyLoss()
     loss_domain = torch.nn.CrossEntropyLoss()
 
-    TEST_INTERVAL = 10
     lr = config['lr']
-    l2_decay = 5e-4
-    momentum = 0.9
 
     res_dir = os.path.join(config['res_dir'], 'lr{}'.format(config['lr']))
     if not os.path.exists(res_dir):
@@ -28,8 +34,6 @@ def train_adda(config):
     set_log_config(res_dir)
 
     logging.debug('train_adda')
-    logging.debug(model.feature)
-    logging.debug(model.class_classifier)
     logging.debug(config)
 
     def pretrain(model, config, pretrain_epochs):

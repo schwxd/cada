@@ -17,10 +17,14 @@ import torch.optim as optim
 # custom imports
 # from cwru_dataset import get_raw_1d
 # from cwru_dataset_all import get_raw_1d
-from cwru_dataset_normal import get_raw_1d
+# from cwru_dataset_normal import get_raw_1d
+# from cwru_dataset_semi import get_raw_1d
+# from cwru_dataset_normal import get_raw_1d
+from cwru_dataset_imbalance import get_raw_1d
+
 
 from models.CNN.train_cnn import train_cnn
-from models.dann_mm.train_dann_mm import train_dann_mm
+from models.dann_mme.train_dann_mme import train_dann_mme
 from models.dann_mm2.train_dann_mm2 import train_dann_mm2
 from models.DDC.train_ddc import train_ddc
 from models.DeepCoral.train_deepcoral import train_deepcoral
@@ -33,18 +37,22 @@ from models.MCD.train_mcd import train_mcd
 from models.MCD_A.train_mcd_a import train_mcd_a
 
 from models.CDAN_VAT.train_cdan_vat import train_cdan_vat
-from models.CDAN_ICAN.train_cdan_ican import train_cdan_ican
-from models.CDAN_IW.train_cdan_iw import train_cdan_iw
+# from models.CDAN_ICAN.train_cdan_ican import train_cdan_ican
+# from models.CDAN_IW.train_cdan_iw import train_cdan_iw
 from models.DCTLN.train_dctln import train_dctln
 from models.PADA.train_pada import train_pada
 from models.dann_vat.train_dann_vat import train_dann_vat
 from models.tcl.train_tcl import train_tcl
+from models.tcl_vat.train_tcl_vat import train_tcl_vat
+from models.AEMMD.train_aemmd import train_aemmd
+
+torch.set_num_threads(12)
 
 def train(config):
     if config['models'] == 'sourceonly':
         train_cnn(config)
-    if config['models'] == 'dann_mm':
-       train_dann_mm(config)
+    if config['models'] == 'dann_mme':
+       train_dann_mme(config)
     if config['models'] == 'dann_mm2':
        train_dann_mm2(config)
     elif config['models'] == 'deepcoral':
@@ -67,10 +75,10 @@ def train(config):
         train_mcd_a(config)
     elif config['models'] in ['CDAN_VAT', 'DANN_VAT']:
         train_cdan_vat(config)
-    elif config['models'] in ['CDAN_ICAN',  'DANN_EIW']:
-        train_cdan_ican(config)
-    elif config['models'] in ['CDAN_IW', 'DANN_IW']:
-        train_cdan_iw(config)
+    # elif config['models'] in ['CDAN_ICAN',  'DANN_EIW']:
+        # train_cdan_ican(config)
+    # elif config['models'] in ['CDAN_IW', 'DANN_IW']:
+        # train_cdan_iw(config)
     elif config['models'] == 'DCTLN':
         train_dctln(config)
     elif config['models'] == 'PADA':
@@ -79,6 +87,10 @@ def train(config):
         train_dann_vat(config)
     elif config['models'] == 'tcl':
         train_tcl(config)
+    elif config['models'] == 'tcl_vat':
+        train_tcl_vat(config)
+    elif config['models'] == 'aemmd':
+        train_aemmd(config)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Transfer Learning')
@@ -100,7 +112,7 @@ if __name__ == "__main__":
     # model & loss
     parser.add_argument('--models', type=str, default='CDAN_ICAN', help="choose which model to run")
     parser.add_argument('--n_epochs', type=int, default=100, help="number of epochs")
-    parser.add_argument('--batch_size', type=int, default=256, help="batch size")
+    parser.add_argument('--batch_size', type=int, default=32, help="batch size")
     parser.add_argument('--gpu_id', type=str, nargs='?', default='0', help="device id to run")
     parser.add_argument('--loss_name', type=str, nargs='?', default='JAN', help="loss name")
     parser.add_argument('--tradeoff', type=float, nargs='?', default=1, help="tradeoff")
@@ -142,6 +154,15 @@ if __name__ == "__main__":
     parser.add_argument('--Ldthred', required=False, type=float, default=0.55, help='')
     parser.add_argument('--lambdad', required=False, type=float, default=0.1, help='')
 
+    parser.add_argument('--mmd', required=False, type=int, default=0, help='')
+    parser.add_argument('--bnm', required=False, type=int, default=0, help='')
+    parser.add_argument('--ent', required=False, type=int, default=0, help='')
+    parser.add_argument('--vat', required=False, type=int, default=0, help='')
+
+    parser.add_argument('--bnm_sw', required=False, type=float, default=1, help='')
+    parser.add_argument('--bnm_tw', required=False, type=float, default=1, help='')
+    parser.add_argument('--bnm_ew', required=False, type=float, default=1, help='')
+
     args = parser.parse_args()
     os.environ["CUDA_VISIBLE_DEVICES"] = args.gpu_id 
 
@@ -154,22 +175,43 @@ if __name__ == "__main__":
 
     config = {}
 
-    config['source_train_loader'], config['source_test_loader'], classes = get_raw_1d(src_dataset, 
+    # config['source_train_loader'], config['source_test_loader'], classes = get_raw_1d(src_dataset, 
+    #                                                                                     batch_size=args.batch_size, 
+    #                                                                                     trainonly=False, 
+    #                                                                                     split=0.8, 
+    #                                                                                     snr=args.snr, 
+    #                                                                                     snrp=args.snrp,
+    #                                                                                     normal=args.normal,
+    #                                                                                     slim=0,
+    #                                                                                     target_labeling=0)
+    # config['target_train_loader'], config['target_test_loader'], _ = get_raw_1d(tgt_dataset, 
+    #                                                                                     batch_size=args.batch_size, 
+    #                                                                                     trainonly=False, 
+    #                                                                                     split=args.split, 
+    #                                                                                     snr=0,
+    #                                                                                     snrp=0,
+    #                                                                                     normal=args.normal,
+    #                                                                                     slim=args.slim,
+    #                                                                                     target_labeling=args.target_labeling)
+
+    config['source_train_loader'], config['source_test_loader'], _, classes = get_raw_1d(src_dataset, 
                                                                                         batch_size=args.batch_size, 
                                                                                         trainonly=False, 
                                                                                         split=0.8, 
                                                                                         snr=args.snr, 
                                                                                         snrp=args.snrp,
                                                                                         normal=args.normal,
-                                                                                        slim=args.slim)
-    config['target_train_loader'], config['target_test_loader'], _ = get_raw_1d(tgt_dataset, 
+                                                                                        slim=0,
+                                                                                        target_labeling=0)
+    config['target_train_loader'], config['target_test_loader'], config['target_train_semi_loader'], _ = get_raw_1d(tgt_dataset, 
                                                                                         batch_size=args.batch_size, 
                                                                                         trainonly=False, 
                                                                                         split=args.split, 
                                                                                         snr=0,
                                                                                         snrp=0,
                                                                                         normal=args.normal,
-                                                                                        slim=0)
+                                                                                        slim=args.slim,
+                                                                                        target_labeling=args.target_labeling)
 
     config['models'] = args.models
     config['network'] = args.network
@@ -209,10 +251,20 @@ if __name__ == "__main__":
     config['target_labeling'] = args.target_labeling
     config['bn'] = args.bn
     config['iw'] = args.iw
-    config['startiter'] = 50
+    config['startiter'] = 30
     config['traded'] = 1
-    config['tradet'] = 0.1
+    config['tradet'] = 0
     config['Lythred'] = args.Lythred
     config['Ldthred'] = args.Ldthred
     config['lambdad'] = args.lambdad
+
+    config['mmd'] = args.mmd
+    config['bnm'] = args.bnm
+    config['vat'] = args.vat
+    config['ent'] = args.ent
+
+    config['bnm_sw'] = args.bnm_sw
+    config['bnm_tw'] = args.bnm_tw
+    config['bnm_ew'] = args.bnm_ew
+
     train(config)

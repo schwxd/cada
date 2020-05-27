@@ -23,37 +23,26 @@ from itertools import islice
 import argparse
 parser = argparse.ArgumentParser()
 parser.add_argument('--dataroot', required=False, default='D:/fault/cdan-machines/matdata/seu-bearingset', help='where the data folder is')
-parser.add_argument('--outputpath', required=False, default='ims', help='where the output folder is')
+parser.add_argument('--outputpath', required=False, default='seu', help='where the output folder is')
 parser.add_argument('--framesize', type=int, required=False, default=2048, help='frame size')
 parser.add_argument('--trainnumber', type=int, required=False, default=1000, help='how many samples each class for training dataset')
 parser.add_argument('--normal', required=False, type=int, default=0, help='normal or not')
 parser.add_argument('--fft', required=False, type=int, default=0, help='use fft or not')
 args = parser.parse_args()
 
-
 """
-故障情况：
-    1st 的轴承3：IR
-    1st 的轴承4：Ball
-    2nd 的轴承1：OR
-    3rd 的轴承3：OR
-    其他的是正常
-采样频率：20kHz
-转速：2000rpm
-最小的frame length：60/2000 * 2 * 20000 = 1200
+    东南大学邵思雨轴承实验台
+        https://github.com/cathysiyu/Mechanical-datasets
+    工况：
+        两种工况，20-0和30-2（转速-负载）
+    故障类型和标签：
+        Healthy：0
+        IR：1
+        OR：2
+        Ball：3
+        Combo：暂没用到
+    故障深度：不区分故障深度
 """
-
-"""
-    标签：
-    Healthy：0
-    IR：1
-    OR：2
-    Ball：3
-"""
-
-
-
-
 
 def load_csvfile(filename, dataname, label, signal_size, samplenumber):
     f = open(filename, "r", encoding='gb18030', errors='ignore')
@@ -155,7 +144,6 @@ def draw_fig(data, labels, count, prefix, res_dir):
             plt.close()
 
 if __name__ == "__main__":
-
     #Data names of 5 bearing fault types under two working conditions
     # Bdata = ["ball_20_0.csv","comb_20_0.csv","health_20_0.csv","inner_20_0.csv","outer_20_0.csv","ball_30_2.csv","comb_30_2.csv","health_30_2.csv","inner_30_2.csv","outer_30_2.csv"]
 
@@ -218,5 +206,3 @@ if __name__ == "__main__":
     np.save("{}/data_features_train.npy".format(res_dir), features_shuffled)
     np.save("{}/data_labels_train.npy".format(res_dir), labels_shuffled)
     print("files save to {}/data_features_train.npy".format(res_dir))
-
-

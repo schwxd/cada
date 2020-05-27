@@ -63,7 +63,9 @@ def test(extractor, classifier, data_loader, epoch):
             if torch.cuda.is_available():
                 features, labels = features.cuda(), labels.cuda()
 
-            preds = classifier(extractor(features))
+            outputs = extractor(features)
+            outputs = outputs.view(outputs.size(0), -1)
+            preds, _ = classifier(outputs)
             loss += criterion(preds, labels).item()
 
             pred_cls = preds.data.max(1)[1]

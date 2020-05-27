@@ -12,17 +12,18 @@ from utils.functions import test, set_log_config, ReverseLayerF
 from utils.vis import draw_tsne, draw_confusion_matrix
 from networks.network import Extractor, Classifier, Critic, Critic2, RandomLayer, AdversarialNetwork
 from networks.network import Predictor, Predictor_deep
-from networks.inceptionv4 import InceptionV4, InceptionV4Aux
+from networks.inceptionv1 import InceptionV1, InceptionV1s
 from torchsummary import summary
 
 def train_dann_mm2(config):
-    if config['inception'] == 1:
-        # extractor = InceptionV4(num_classes=32)
-        extractor = InceptionV4Aux(num_classes=32)
+    if config['network'] == 'inceptionv1':
+        extractor = InceptionV1(num_classes=32)
+    elif config['network'] == 'inceptionv1s':
+        extractor = InceptionV1s(num_classes=32)
     else:
-        extractor = Extractor(n_flattens=config['n_flattens'], n_hiddens=config['n_hiddens'])
-    # classifier = Classifier(n_flattens=config['n_flattens'], n_hiddens=config['n_hiddens'], n_class=config['n_class'])
-    classifier = Predictor_deep(n_flattens=config['n_flattens'], n_hiddens=config['n_hiddens'], num_class=config['n_class'])
+        extractor = Extractor(n_flattens=config['n_flattens'], n_hiddens=config['n_hiddens'], bn=config['bn'])
+    classifier = Classifier(n_flattens=config['n_flattens'], n_hiddens=config['n_hiddens'], n_class=config['n_class'])
+    # classifier = Predictor_deep(n_flattens=config['n_flattens'], n_hiddens=config['n_hiddens'], num_class=config['n_class'])
     critic = Critic2(n_flattens=config['n_flattens'], n_hiddens=config['n_hiddens'])
     if torch.cuda.is_available():
         extractor = extractor.cuda()
@@ -30,26 +31,18 @@ def train_dann_mm2(config):
         critic = critic.cuda()
         summary(extractor, (1, 5120))
 
-    criterion = torch.nn.CrossEntropyLoss()
-    loss_class = torch.nn.CrossEntropyLoss()
-    loss_domain = torch.nn.CrossEntropyLoss()
-
     res_dir = os.path.join(config['res_dir'], 'snr{}-lr{}'.format(config['snr'], config['lr']))
     if not os.path.exists(res_dir):
         os.makedirs(res_dir)
 
     set_log_config(res_dir)
-    logging.debug('train_dann')
+    logging.debug('train_dann_mm2')
     logging.debug(extractor)
     logging.debug(classifier)
     logging.debug(critic)
     logging.debug(config)
 
-    # optimizer = optim.Adam([{'params': extractor.parameters()},
-    #     {'params': classifier.parameters()},
-    #     {'params': critic.parameters()}],
-    #     lr=config['lr'])
-
+    criterion = torch.nn.CrossEntropyLoss()
     optimizer_e = optim.Adam(extractor.parameters(), lr=config['lr'])
     optimizer_cls = optim.Adam(classifier.parameters(), lr=config['lr'])
     optimizer_critic = optim.Adam(critic.parameters(), lr=config['lr'])
@@ -77,6 +70,16 @@ def train_dann_mm2(config):
                                                 (torch.log(out_t1 + 1e-5)), 1))
         return loss_adent
 
+    def entropy_softmax(output, lamda):
+        loss_ent = -lamda * torch.mean(torch.sum(output *
+                                                (torch.log(output + 1e-5)), 1))
+        return loss_ent
+
+    def adentropy_softmax(output, lamda):
+        loss_adent = lamda * torch.mean(torch.sum(output *
+                                                (torch.log(output + 1e-5)), 1))
+        return loss_adent
+
     def train(extractor, classifier, critic, config, epoch):
         extractor.train()
         classifier.train()
@@ -98,35 +101,38 @@ def train_dann_mm2(config):
                 data_source, label_source = data_source.cuda(), label_source.cuda()
                 data_target = data_target.cuda()
 
-            # optimizer.zero_grad()
             optimizer_e.zero_grad()
             optimizer_cls.zero_grad()
             optimizer_critic.zero_grad()
 
             class_output_s, domain_output, _ = dann(input_data=data_source, alpha=gamma)
-            err_s_label = loss_class(class_output_s, label_source)
+            err_s_label = criterion(class_output_s, label_source)
             domain_label = torch.zeros(data_source.size(0)).long().cuda()
-            err_s_domain = loss_domain(domain_output, domain_label)
+            err_s_domain = criterion(domain_output, domain_label)
 
             # Training model using target data
             domain_label = torch.ones(data_target.size(0)).long().cuda()
             class_output_t, domain_output, _ = dann(input_data=data_target, alpha=gamma)
-            err_t_domain = loss_domain(domain_output, domain_label)
+            err_t_domain = criterion(domain_output, domain_label)
             err = err_s_label + err_s_domain + err_t_domain
 
-            if i % 20 == 0:
-                print('err_s_label {}, err_s_domain {}, gamma {}, err_t_domain {}, total err {}'.format(err_s_label.item(), err_s_domain.item(), gamma, err_t_domain.item(), err.item()))
+            if i % 100 == 0:
+                print('err_s_label {:.2f}, err_s_domain {:.2f}, gamma {:.2f}, err_t_domain {:.2f}, total err {:.2f}'.format(err_s_label.item(), 
+                            err_s_domain.item(), 
+                            gamma, 
+                            err_t_domain.item(), 
+                            err.item()))
 
             err.backward()
             optimizer_e.step()
             optimizer_cls.step()
             optimizer_critic.step()
-            # optimizer.step()
 
             # minmax
             optimizer_e.zero_grad()
             optimizer_cls.zero_grad()
             feature_t = extractor(data_target)
+            feature_t = feature_t.view(feature_t.size(0), -1)
             # entropy_loss = adentropy(classifier, feature_t, 1)
             entropy_loss = entropy(classifier, feature_t, 1)
             entropy_loss.backward()

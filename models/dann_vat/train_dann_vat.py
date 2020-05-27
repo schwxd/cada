@@ -6,18 +6,20 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 import torch.nn.functional as F
+import time
 
-from networks.network import Extractor, Classifier, Critic, Critic2, RandomLayer, AdversarialNetwork
+from networks.network import Extractor, Classifier2, Critic, Critic2, RandomLayer, AdversarialNetwork
 
 from utils.functions import test, set_log_config, ReverseLayerF
 from utils.vis import draw_tsne, draw_confusion_matrix
+# torch.set_num_threads(1)
 
-# loss params.
-dw = 1e-2
+# combined loss.
+dw = 1
 cw = 1
 sw = 1
-tw = 1e-2
-bw = 1e-2
+tw = 1
+ew = 1
 
 class ConditionalEntropyLoss(torch.nn.Module):
     def __init__(self):
@@ -33,6 +35,14 @@ def get_loss_entropy(inputs):
     entropy_loss = - torch.mean(output * torch.log(output + 1e-6))
 
     return entropy_loss
+
+def get_loss_bnm(inputs):
+    output = F.softmax(inputs, dim=1)
+    # entropy_loss = - torch.mean(output * torch.log(output + 1e-6))
+    # L_BNM = -torch.sum(torch.svd(output, compute_uv=False)[1])
+    L_BNM = -torch.norm(output, 'nuc')
+
+    return L_BNM
 
 class VAT(nn.Module):
     def __init__(self, extractor, classifier, n_power, radius):
@@ -52,7 +62,7 @@ class VAT(nn.Module):
 
         for _ in range(self.n_power):
             d = self.XI * self.get_normalized_vector(d).requires_grad_()
-            logit_m = self.classifier(self.extractor(x + d))
+            logit_m, _ = self.classifier(self.extractor(x + d))
             dist = self.kl_divergence_with_logit(logit, logit_m)
             grad = torch.autograd.grad(dist, [d])[0]
             d = grad.detach()
@@ -71,20 +81,20 @@ class VAT(nn.Module):
     def virtual_adversarial_loss(self, x, logit):
         r_vadv = self.generate_virtual_adversarial_perturbation(x, logit)
         logit_p = logit.detach()
-        logit_m = self.classifier(self.extractor(x + r_vadv))
+        logit_m, _ = self.classifier(self.extractor(x + r_vadv))
         loss = self.kl_divergence_with_logit(logit_p, logit_m)
         return loss
 
 def train_dann_vat(config):
     extractor = Extractor(n_flattens=config['n_flattens'], n_hiddens=config['n_hiddens'])
-    classifier = Classifier(n_flattens=config['n_flattens'], n_hiddens=config['n_hiddens'], n_class=config['n_class'])
+    classifier = Classifier2(n_flattens=config['n_flattens'], n_hiddens=config['n_hiddens'], n_class=config['n_class'])
     critic = Critic2(n_flattens=config['n_flattens'], n_hiddens=config['n_hiddens'])
     if torch.cuda.is_available():
         extractor = extractor.cuda()
         classifier = classifier.cuda()
         critic = critic.cuda()
 
-    res_dir = os.path.join(config['res_dir'], 'slim{}-target_labeling{}-lr{}'.format(config['slim'], config['target_labeling'], config['lr']))
+    res_dir = os.path.join(config['res_dir'], 'BNM-slim{}-targetLabel{}-sw{}-tw{}-ew{}-lr{}'.format(config['slim'], config['target_labeling'], sw, tw, ew, config['lr']))
     if not os.path.exists(res_dir):
         os.makedirs(res_dir)
 
@@ -96,9 +106,9 @@ def train_dann_vat(config):
 
 
     print('train_dann_vat')
-    print(extractor)
-    print(classifier)
-    print(critic)
+    # print(extractor)
+    # print(classifier)
+    # print(critic)
     print(config)
 
     set_log_config(res_dir)
@@ -134,82 +144,96 @@ def train_dann_vat(config):
         iter_target = iter(config['target_train_loader'])
         len_source_loader = len(config['source_train_loader'])
         len_target_loader = len(config['target_train_loader'])
+        if config['slim'] > 0:
+            iter_target_semi = iter(config['target_train_semi_loader'])
+            len_target_semi_loader = len(config['target_train_semi_loader'])
+
         num_iter = len_source_loader
         for i in range(1, num_iter+1):
             data_source, label_source = iter_source.next()
-            data_target, _ = iter_target.next()
+            data_target, label_target = iter_target.next()
+            if config['slim'] > 0:
+                data_target_semi, label_target_semi = iter_target_semi.next()
+                if i % len_target_semi_loader == 0:
+                    iter_target_semi = iter(config['target_train_semi_loader'])
+
             if i % len_target_loader == 0:
                 iter_target = iter(config['target_train_loader'])
             if torch.cuda.is_available():
                 data_source, label_source = data_source.cuda(), label_source.cuda()
-                data_target = data_target.cuda()
+                data_target, label_target = data_target.cuda(), label_target.cuda()
+                if config['slim'] > 0:
+                    data_target_semi, label_target_semi = data_target_semi.cuda(), label_target_semi.cuda()
 
             optimizer.zero_grad()
 
-            class_output_s, domain_output_s, features_source = dann(input_data=data_source, alpha=gamma)
+            class_output_s, domain_output_s, _ = dann(input_data=data_source, alpha=gamma)
             err_s_class = loss_class(class_output_s, label_source)
             domain_label_s = torch.zeros(data_source.size(0)).long().cuda()
             err_s_domain = loss_domain(domain_output_s, domain_label_s)
 
             # Training model using target data
-            class_output_t, domain_output_t, features_target = dann(input_data=data_target, alpha=gamma)
+            class_output_t, domain_output_t, _ = dann(input_data=data_target, alpha=gamma)
             domain_label_t = torch.ones(data_target.size(0)).long().cuda()
             err_t_domain = loss_domain(domain_output_t, domain_label_t)
             # target entropy loss
-            err_t_entropy = get_loss_entropy(class_output_t)
+            # err_t_entropy = get_loss_entropy(class_output_t)
+            err_t_entropy = get_loss_bnm(class_output_t)
 
             # virtual adversarial loss.
             err_s_vat = vat_loss(data_source, class_output_s)
             err_t_vat = vat_loss(data_target, class_output_t)
 
-            err_domain = 0.5 * (err_s_domain + err_t_domain)
+            err_domain = 1 * (err_s_domain + err_t_domain)
 
-            # combined loss.
-            dw = 1
-            cw = 1
-            sw = 1
-            tw = 1
-            bw = 1
             err_all = (
                     dw * err_domain +
                     cw * err_s_class +
                     sw * err_s_vat +
-                    tw * err_t_vat +
-                    tw * err_t_entropy
+                    tw * err_t_vat + 
+                    ew * err_t_entropy
             )
 
-            if i % 20 == 0:
-                print('err_s_class {:.2f}, err_s_domain {:.2f}, gamma {:.2f}, err_t_domain {:.2f}, err_t_vat {:.2f}, err_s_vat {:.2f}, err_all {:.2f}'.format(err_s_class.item(), 
-                                                err_s_domain.item(), 
-                                                gamma, 
-                                                err_t_domain.item(),
-                                                err_s_vat.item(),
-                                                err_t_vat.item(),
-                                                err_all.item()))
+            if config['slim'] > 0:
+                feature_target_semi = extractor(data_target_semi)
+                feature_target_semi = feature_target_semi.view(feature_target_semi.size(0), -1)
+                preds_target_semi = classifier(feature_target_semi)
+                err_t_class_semi = loss_class(preds_target_semi, label_target_semi)
+                err_all += err_t_class_semi
+                # if i % 100 == 0:
+                #     print('epoch {}, err_t_class_semi {:.2f}'.format(epoch, err_t_class_semi.item()))
+
+            # if config['target_labeling'] == 1:
+            #     err_t_class_healthy = nn.CrossEntropyLoss()(class_output_t, label_target)
+            #     err_all += err_t_class_healthy
+                # if i % 100 == 0:
+                    # print('err_t_class_healthy {:.2f}'.format(err_t_class_healthy.item()))
+
+            # if i % 100 == 0:
+            #     print('err_s_class {:.2f}, err_s_domain {:.2f}, gamma {:.2f}, err_t_domain {:.2f}, err_s_vat {:.2f}, err_t_vat {:.2f}, err_t_entropy {:.2f}, err_all {:.2f}'.format(err_s_class.item(), 
+            #                                     err_s_domain.item(), 
+            #                                     gamma, 
+            #                                     err_t_domain.item(),
+            #                                     err_s_vat.item(),
+            #                                     err_t_vat.item(),
+            #                                     err_t_entropy.item(),
+            #                                     err_all.item()))
 
             err_all.backward()
             optimizer.step()
 
 
-    if config['testonly'] == 0:
-        best_accuracy = 0
-        best_model_index = -1
-        for epoch in range(1, config['n_epochs'] + 1):
-            train(extractor, classifier, critic, config, epoch)
-            if epoch % config['TEST_INTERVAL'] == 0:
-                print('test on source_test_loader')
-                test(extractor, classifier, config['source_test_loader'], epoch)
-                print('test on target_test_loader')
-                accuracy = test(extractor, classifier, config['target_test_loader'], epoch)
+    for epoch in range(1, config['n_epochs'] + 1):
+        print('epoch {}'.format(epoch))
+        print(time.strftime('%Y-%m-%d %H:%M:%S',time.localtime(time.time())))
+        train(extractor, classifier, critic, config, epoch)
+        if epoch % config['TEST_INTERVAL'] == 0:
+            print('test on source_test_loader')
+            test(extractor, classifier, config['source_test_loader'], epoch)
+            print('test on target_test_loader')
+            test(extractor, classifier, config['target_test_loader'], epoch)
 
-                if accuracy > best_accuracy:
-                    best_accuracy = accuracy
-                    best_model_index = epoch
-                print('epoch {} accuracy: {:.6f}, best accuracy {:.6f} on epoch {}'.format(epoch, accuracy, best_accuracy, best_model_index))
-
-
-            if epoch % config['VIS_INTERVAL'] == 0:
-                title = config['models']
-                draw_confusion_matrix(extractor, classifier, config['target_test_loader'], res_dir, epoch, title)
-                draw_tsne(extractor, classifier, config['source_test_loader'], config['target_test_loader'], res_dir, epoch, title, separate=True)
-                # draw_tsne(extractor, classifier, config['source_test_loader'], config['target_test_loader'], res_dir, epoch, title, separate=False)
+        if epoch % config['VIS_INTERVAL'] == 0:
+            draw_confusion_matrix(extractor, classifier, config['target_test_loader'], res_dir, epoch, config['models'])
+            draw_tsne(extractor, classifier, config['source_test_loader'], config['target_test_loader'], res_dir, epoch, config['models'], separate=True)
+            # draw_tsne(extractor, classifier, config['source_test_loader'], config['target_test_loader'], res_dir, epoch, config['models'], separate=False)

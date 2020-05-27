@@ -16,6 +16,58 @@ from networks.inceptionv1 import InceptionV1, InceptionV1s
 from torchsummary import summary
 from utils.functions import test, set_log_config
 from utils.vis import draw_tsne, draw_confusion_matrix
+import torch.nn.functional as F
+torch.set_num_threads(2)
+
+
+def get_loss_bnm(inputs):
+    output = F.softmax(inputs, dim=1)
+    # entropy_loss = - torch.mean(output * torch.log(output + 1e-6))
+    # L_BNM = -torch.sum(torch.svd(output, compute_uv=False)[1])
+    L_BNM = -torch.norm(output, 'nuc')
+
+    return L_BNM
+
+class VAT(nn.Module):
+    def __init__(self, extractor, classifier, n_power, radius):
+        super(VAT, self).__init__()
+        self.n_power = n_power
+        self.XI = 1e-6
+        self.extractor = extractor
+        self.classifier = classifier
+        self.epsilon = radius
+
+    def forward(self, X, logit):
+        vat_loss = self.virtual_adversarial_loss(X, logit)
+        return vat_loss
+
+    def generate_virtual_adversarial_perturbation(self, x, logit):
+        d = torch.randn_like(x, device='cuda')
+
+        for _ in range(self.n_power):
+            d = self.XI * self.get_normalized_vector(d).requires_grad_()
+            logit_m = self.classifier(self.extractor(x + d))
+            dist = self.kl_divergence_with_logit(logit, logit_m)
+            grad = torch.autograd.grad(dist, [d])[0]
+            d = grad.detach()
+
+        return self.epsilon * self.get_normalized_vector(d)
+
+    def kl_divergence_with_logit(self, q_logit, p_logit):
+        q = F.softmax(q_logit, dim=1)
+        qlogq = torch.mean(torch.sum(q * F.log_softmax(q_logit, dim=1), dim=1))
+        qlogp = torch.mean(torch.sum(q * F.log_softmax(p_logit, dim=1), dim=1))
+        return qlogq - qlogp
+
+    def get_normalized_vector(self, d):
+        return F.normalize(d.view(d.size(0), -1), p=2, dim=1).reshape(d.size())
+
+    def virtual_adversarial_loss(self, x, logit):
+        r_vadv = self.generate_virtual_adversarial_perturbation(x, logit)
+        logit_p = logit.detach()
+        logit_m = self.classifier(self.extractor(x + r_vadv))
+        loss = self.kl_divergence_with_logit(logit_p, logit_m)
+        return loss
 
 
 def train_cdan(config):
@@ -27,13 +79,15 @@ def train_cdan(config):
         extractor = Extractor(n_flattens=config['n_flattens'], n_hiddens=config['n_hiddens'], bn=config['bn'])
 
     classifier = Classifier(n_flattens=config['n_flattens'], n_hiddens=config['n_hiddens'], n_class=config['n_class'])
+    vat_loss = VAT(extractor, classifier, n_power=1, radius=3.5).cuda()
 
     if torch.cuda.is_available():
         extractor = extractor.cuda()
         classifier = classifier.cuda()
 
     cdan_random = config['random_layer'] 
-    res_dir = os.path.join(config['res_dir'], 'slim{}-snr{}-snrp{}-lr{}'.format(config['slim'],
+    res_dir = os.path.join(config['res_dir'], 'slim{}-targetLabel{}-snr{}-snrp{}-lr{}'.format(config['slim'],
+                                                                        config['target_labeling'],
                                                                         config['snr'],
                                                                         config['snrp'],
                                                                         config['lr']))
@@ -84,15 +138,25 @@ def train_cdan(config):
         iter_target = iter(config['target_train_loader'])
         len_source_loader = len(config['source_train_loader'])
         len_target_loader = len(config['target_train_loader'])
+        if config['slim'] > 0:
+            iter_target_semi = iter(config['target_train_semi_loader'])
+            len_target_semi_loader = len(config['target_train_semi_loader'])
+
         num_iter = len_source_loader
         for step in range(1, num_iter + 1):
             data_source, label_source = iter_source.next()
             data_target, label_target = iter_target.next()
+            if config['slim'] > 0:
+                data_target_semi, label_target_semi = iter_target_semi.next()
+                if step % len_target_semi_loader == 0:
+                    iter_target_semi = iter(config['target_train_semi_loader'])
             if step % len_target_loader == 0:
                 iter_target = iter(config['target_train_loader'])
             if torch.cuda.is_available():
                 data_source, label_source = data_source.cuda(), label_source.cuda()
                 data_target, label_target = data_target.cuda(), label_target.cuda()
+                if config['slim'] > 0:
+                    data_target_semi, label_target_semi = data_target_semi.cuda(), label_target_semi.cuda()
 
             optimizer.zero_grad()
             optimizer_ad.zero_grad()
@@ -129,11 +193,23 @@ def train_cdan(config):
                 d_loss = 0
 
             loss = cls_loss + d_loss
+
+            err_t_bnm = get_loss_bnm(target_preds)
+            err_s_vat = vat_loss(data_source, source_preds)
+            err_t_vat = vat_loss(data_target, target_preds)
+            loss +=  1.0 * err_s_vat + 1.0 * err_t_vat + 1.0 * err_t_bnm
+
+            if config['slim'] > 0:
+                feature_target_semi = extractor(data_target_semi)
+                feature_target_semi = feature_target_semi.view(feature_target_semi.size(0), -1)
+                preds_target_semi = classifier(feature_target_semi)
+                loss += nn.CrossEntropyLoss()(preds_target_semi, label_target_semi)
+
             loss.backward()
             optimizer.step()
             if epoch > start_epoch:
                 optimizer_ad.step()
-            if (step) % 20 == 0:
+            if (step) % 100 == 0:
                 print('Train Epoch {} closs {:.6f}, dloss {:.6f}, Loss {:.6f}'.format(epoch, cls_loss.item(), d_loss.item(), loss.item()))
 
     if config['testonly'] == 0:

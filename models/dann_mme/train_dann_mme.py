@@ -14,8 +14,11 @@ from networks.network import Predictor, Predictor_deep
 from networks.network import Extractor, Classifier, Critic, Critic2, RandomLayer, AdversarialNetwork
 from torchsummary import summary
 
-
-def train_dann_mm(config):
+"""
+在dann基础上，增加Minimax Entropy
+2019_Semi-supervised Domain Adaptation via Minimax Entropy
+"""
+def train_dann_mme(config):
     if config['inception'] == 1:
         extractor = InceptionV4(num_classes=32)
     else:
@@ -31,7 +34,7 @@ def train_dann_mm(config):
         os.makedirs(res_dir)
 
     set_log_config(res_dir)
-    logging.debug('train_dann')
+    logging.debug('train_dann_mme')
     logging.debug(extractor)
     logging.debug(classifier)
     logging.debug(config)

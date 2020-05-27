@@ -18,40 +18,40 @@ class Extractor(nn.Module):
         self.feature = nn.Sequential()
 
         # features 使用1-D CNN提取特征
-        self.feature.add_module('f_conv1', nn.Conv1d(1, 8, kernel_size=64, stride=2))
+        self.feature.add_module('f_conv1', nn.Conv1d(1, 8, kernel_size=8, stride=2))
         if bn:
             self.feature.add_module('f_bn1', nn.BatchNorm1d(8))
         self.feature.add_module('f_relu1', nn.ReLU(True))
-        self.feature.add_module('f_pool1', nn.MaxPool1d(kernel_size=2, stride=2))
+        # self.feature.add_module('f_pool1', nn.MaxPool1d(kernel_size=2, stride=2))
         self.feature.add_module('f_drop1', nn.Dropout(0.5))
 
-        self.feature.add_module('f_conv2', nn.Conv1d(8, 16, kernel_size=16, stride=2))
+        self.feature.add_module('f_conv2', nn.Conv1d(8, 16, kernel_size=5, stride=2))
         if bn:
             self.feature.add_module('f_bn2', nn.BatchNorm1d(16))
         self.feature.add_module('f_relu2', nn.ReLU(True))
-        self.feature.add_module('f_pool2', nn.MaxPool1d(kernel_size=2, stride=2))
+        # self.feature.add_module('f_pool2', nn.MaxPool1d(kernel_size=2, stride=2))
         self.feature.add_module('f_drop2', nn.Dropout(0.5))
 
-        self.feature.add_module('f_conv3', nn.Conv1d(16, 32, kernel_size=8, stride=2))
+        self.feature.add_module('f_conv3', nn.Conv1d(16, 32, kernel_size=5, stride=2))
         if bn:
             self.feature.add_module('f_bn3', nn.BatchNorm1d(32))
         self.feature.add_module('f_relu3', nn.ReLU(True))
-        self.feature.add_module('f_pool3', nn.MaxPool1d(kernel_size=2, stride=2))
+        # self.feature.add_module('f_pool3', nn.MaxPool1d(kernel_size=2, stride=2))
         self.feature.add_module('f_drop3', nn.Dropout(0.5))
 
         self.feature.add_module('f_conv4', nn.Conv1d(32, 64, kernel_size=3, stride=2))
         if bn:
             self.feature.add_module('f_bn4', nn.BatchNorm1d(64))
         self.feature.add_module('f_relu4', nn.ReLU(True))
-        self.feature.add_module('f_pool4', nn.MaxPool1d(kernel_size=2, stride=2))
+        # self.feature.add_module('f_pool4', nn.MaxPool1d(kernel_size=2, stride=2))
         self.feature.add_module('f_drop4', nn.Dropout(0.5)) 
 
-        self.feature.add_module('f_conv5', nn.Conv1d(64, 128, kernel_size=3, stride=2))
-        if bn:
-            self.feature.add_module('f_bn5', nn.BatchNorm1d(128))
-        self.feature.add_module('f_relu5', nn.ReLU(True))
-        self.feature.add_module('f_pool5', nn.MaxPool1d(kernel_size=2, stride=2))
-        self.feature.add_module('f_drop5', nn.Dropout(0.5))
+        # self.feature.add_module('f_conv5', nn.Conv1d(64, 128, kernel_size=3, stride=2))
+        # if bn:
+        #     self.feature.add_module('f_bn5', nn.BatchNorm1d(128))
+        # self.feature.add_module('f_relu5', nn.ReLU(True))
+        # self.feature.add_module('f_pool5', nn.MaxPool1d(kernel_size=2, stride=2))
+        # self.feature.add_module('f_drop5', nn.Dropout(0.5))
 
         #self.feature.add_module('f_conv6', nn.Conv1d(128, 256, kernel_size=3, stride=2))
         #self.feature.add_module('f_bn6', nn.BatchNorm1d(32))
@@ -76,9 +76,64 @@ class Extractor(nn.Module):
 
     def forward(self, x):
         x = self.feature(x)
-        output = x.view(x.size(0), -1)
-        return output
+        # print('extractor1 {}'.format(x.shape))
+        # output = x.view(x.size(0), -1)
+        # print('extractor2 {}'.format(output.shape))
+        # return output
+        return x
 
+class Decoder(nn.Module):
+    def __init__(self, n_flattens, bn=False):
+        super(Decoder, self).__init__()
+        self.n_flattens = n_flattens
+        self.feature = nn.Sequential()
+
+        # features 使用1-D CNN提取特征
+        # self.feature.add_module('f_conv1', nn.Conv1d(64, 32, kernel_size=3, stride=1))
+        # self.feature.add_module('f_conv1', nn.ConvTranspose1d(64, 32, kernel_size=3, stride=2, padding=1, output_padding=1, bias=False)) 
+        self.feature.add_module('f_conv1', nn.ConvTranspose1d(64, 32, kernel_size=3, stride=2, bias=False)) 
+        if bn:
+            self.feature.add_module('f_bn1', nn.BatchNorm1d(32))
+        self.feature.add_module('f_relu1', nn.ReLU(True))
+        # self.feature.add_module('f_pool1', nn.Upsample(scale_factor=2, mode='linear'))
+        # self.feature.add_module('f_drop1', nn.Dropout(0.5))
+
+        # self.feature.add_module('f_conv2', nn.Conv1d(8, 16, kernel_size=5, stride=1))
+        # self.feature.add_module('f_conv2', nn.ConvTranspose1d(32, 16, kernel_size=5, stride=2, padding=1, output_padding=1, bias=False)) 
+        self.feature.add_module('f_conv2', nn.ConvTranspose1d(32, 16, kernel_size=5, stride=2, bias=False)) 
+        if bn:
+            self.feature.add_module('f_bn2', nn.BatchNorm1d(16))
+        self.feature.add_module('f_relu2', nn.ReLU(True))
+        # self.feature.add_module('f_pool2', nn.Upsample(scale_factor=2, mode='linear'))
+        # self.feature.add_module('f_drop2', nn.Dropout(0.5))
+
+        # self.feature.add_module('f_conv3', nn.Conv1d(16, 32, kernel_size=5, stride=1))
+        # self.feature.add_module('f_conv3', nn.ConvTranspose1d(16, 8, kernel_size=5, stride=2, padding=1, output_padding=1, bias=False)) 
+        self.feature.add_module('f_conv3', nn.ConvTranspose1d(16, 8, kernel_size=5, stride=2, bias=False)) 
+        if bn:
+            self.feature.add_module('f_bn3', nn.BatchNorm1d(8))
+        self.feature.add_module('f_relu3', nn.ReLU(True))
+        # self.feature.add_module('f_pool3', nn.Upsample(scale_factor=2, mode='linear'))
+        # self.feature.add_module('f_drop3', nn.Dropout(0.5))
+
+        # self.feature.add_module('f_conv4', nn.Conv1d(32, 64, kernel_size=8, stride=1))
+        # self.feature.add_module('f_conv4', nn.ConvTranspose1d(8, 1, kernel_size=8, stride=2, padding=1, output_padding=1, bias=False)) 
+        self.feature.add_module('f_conv4', nn.ConvTranspose1d(8, 1, kernel_size=8, stride=2, bias=False)) 
+        if bn:
+            self.feature.add_module('f_bn4', nn.BatchNorm1d(1))
+        self.feature.add_module('f_relu4', nn.ReLU(True))
+        # self.feature.add_module('f_pool4', nn.Upsample(scale_factor=2, mode='linear'))
+        # self.feature.add_module('f_drop4', nn.Dropout(0.5)) 
+
+    def forward(self, x):
+        # print('decoder1 {}'.format(x.shape))
+        # x = x.view(x.size(0), 1, x.size(1))
+        x = x.view(x.size(0), 64, -1)
+        # print('decoder2 {}'.format(x.shape))
+        x = self.feature(x)
+        # print('decoder3 {}'.format(x.shape))
+        # output = x.view(x.size(0), -1)
+        return x
 
 class Classifier(nn.Module):
     def __init__(self, n_flattens, n_hiddens, n_class, bn=False):
@@ -110,6 +165,52 @@ class Classifier(nn.Module):
         output = self.class_classifier(x)
         return output
 
+
+class Classifier2(nn.Module):
+    def __init__(self, n_flattens, n_hiddens, n_class, bn=False):
+        super(Classifier2, self).__init__()
+        # feature之后的维度
+        self.n_flattens = n_flattens
+        # 全连接层的hidden size
+        self.n_hiddens = n_hiddens
+        # 分类器输出的类别个数
+        self.n_class = n_class
+
+        self.class_classifier = nn.Sequential()
+
+        # class_classifier 使用全连接层进行分类
+        self.class_classifier = nn.Sequential()
+        self.class_classifier.add_module('c_fc1', nn.Linear(self.n_flattens, self.n_hiddens))
+        self.class_classifier.add_module('c_relu1', nn.ReLU(True))
+        self.class_classifier.add_module('c_drop1', nn.Dropout(0.5))
+        self.class_classifier.add_module('c_fc2', nn.Linear(self.n_hiddens, self.n_hiddens))
+        self.class_classifier.add_module('c_relu2', nn.ReLU(True))
+        self.class_classifier.add_module('c_drop2', nn.Dropout(0.5))
+        self.class_classifier.add_module('c_fc3', nn.Linear(self.n_hiddens, self.n_class))
+        
+        self.features1 = nn.Sequential(
+            nn.Linear(self.n_flattens, self.n_hiddens),
+            nn.ReLU(True),
+            nn.Dropout(0.5)
+        )
+
+        self.features2  = nn.Sequential(
+            nn.Linear(self.n_hiddens, self.n_hiddens),
+            nn.ReLU(True),
+            nn.Dropout(0.5)
+        )
+
+        self.features3  = nn.Sequential(
+            nn.Linear(self.n_hiddens, self.n_class),
+        )
+
+
+    def forward(self, x):
+        x = x.view(x.size(0), -1)
+        inputs = self.features1(x)
+        hidden = self.features2(inputs)
+        outputs = self.features3(hidden)
+        return outputs, hidden
 
 
 # class ClassifierAux(nn.Module):

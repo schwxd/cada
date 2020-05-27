@@ -29,6 +29,7 @@ parser.add_argument('--severity', required=False, default='incipient', help='1: 
 
 args = parser.parse_args()
 
+label_offset = {'incipient':0, 'medium':1, 'severe':2}
 
 """
 故障情况：
@@ -43,26 +44,35 @@ args = parser.parse_args()
 """
 
 # 跟cwru保持一致
-HEALTH = 2
+# HEALTH = 2
+# IR = 1
+# OR = 3
+# BALL = 0
+
+# 与李响论文一致
+HEALTH = 0
 IR = 1
-OR = 3
-BALL = 0
+BALL = 4
+OR = 7
 
 # labels1 = {'B1a':-1,'B1b':-1,'B2a':-1,'B2b':-1, 'B3a':IR,'B3b':-1,'B4a':BALL,'B4b':-1}
 # labels1 = [-1, -1, -1, -1, IR, -1, BALL, -1]
 labels1 = [-1, -1, -1, -1, -1, IR, -1, BALL]
 # 总文件个数2156个
-count_begin1 = {'incipient':1500, 'medium':1700, 'severe':1900}
+# count_begin1 = {'incipient':1500, 'medium':1700, 'severe':1900}
+count_begin1 = {'incipient':200, 'medium':1200, 'severe':2000}
 
 # labels2 = {'B1':OR,'B2':-1,'B3':-1,'B4':HEALTH}
 labels2 = [OR, -1, -1, HEALTH]
 # 总文件个数985个
-count_begin2 = {'incipient':300, 'medium':500, 'severe':700}
+# count_begin2 = {'incipient':300, 'medium':500, 'severe':700}
+count_begin2 = {'incipient':100, 'medium':400, 'severe':700}
 
 # labels3 = {'B1':-1,'B2':-1,'B3':OR,'B4':-1}
 labels3 = [-1, -1, OR, HEALTH]
 # 总文件个数6325个
-count_begin3 = {'incipient':5700, 'medium':5900, 'severe':6100}
+# count_begin3 = {'incipient':5700, 'medium':5900, 'severe':6100}
+count_begin3 = {'incipient':1000, 'medium':3000, 'severe':6100}
 
 FILES_PER_CLASS = 200
 
@@ -109,9 +119,18 @@ def get_data2(path_to_data, data_dict, severity):
     merged_data = np.concatenate(merged_data, axis=0)
     print('merged_data type {}, shape {}'.format(type(merged_data), merged_data.shape))
     for column in range(merged_data.shape[1]):
-        if labels[column] >= 0:
+        # if labels[column] >= 0:
+        #     data_dict[labels[column]] = merged_data[:, column]
+        #     print('take column {} as label {}'.format(column, labels[column]))
+        if labels[column] == HEALTH:
             data_dict[labels[column]] = merged_data[:, column]
             print('take column {} as label {}'.format(column, labels[column]))
+        elif labels[column] > 0:
+            label_dict = labels[column] + label_offset[severity]
+            data_dict[label_dict] = merged_data[:, column]
+            print('take {} column {} under severity {} as label {}'.format(txtname, column, severity, label_dict))
+
+
 
     print(data_dict.keys())
     # 保存加载了哪些文件，用于校验
@@ -216,27 +235,36 @@ def do_scalar(features, normal):
     return features_scaled 
 
 def get_ims(dataroot, severity):
-    res_dir = 'ims-{}-fft{}-normal{}-fs{}-num{}'.format(severity, args.fft, args.normal, args.framesize, args.trainnumber)
+    res_dir = 'ims-{}-fft{}-fs{}-num{}'.format(severity, args.fft, args.framesize, args.trainnumber)
     if not os.path.exists(res_dir):
         os.makedirs(res_dir)
 
+    # 用于存储加载的数据
     data_dict = {}
 
     # 加载文件
-    get_data2(path_to_data=os.path.join(dataroot, '1st_test'), data_dict=data_dict, severity=severity)
-    # get_data2(path_to_data='F:/ds/IMS/2nd_test', data_dict=data_dict, count_begin=600, count_end=800)
-    get_data2(path_to_data=os.path.join(dataroot, '3rd_test'), data_dict=data_dict, severity=severity)
+    if severity == 'all':
+        for item in ['incipient', 'medium', 'severe']:
+            get_data2(path_to_data=os.path.join(dataroot, '1st_test'), data_dict=data_dict, severity=item)
+            # get_data2(path_to_data='F:/ds/IMS/2nd_test', data_dict=data_dict, count_begin=600, count_end=800)
+            get_data2(path_to_data=os.path.join(dataroot, '3rd_test'), data_dict=data_dict, severity=item)
+
+    else:
+        get_data2(path_to_data=os.path.join(dataroot, '1st_test'), data_dict=data_dict, severity=severity)
+        # get_data2(path_to_data='F:/ds/IMS/2nd_test', data_dict=data_dict, count_begin=600, count_end=800)
+        get_data2(path_to_data=os.path.join(dataroot, '3rd_test'), data_dict=data_dict, severity=severity)
+
+    print('data_dict keys {}'.format(data_dict.keys()))
 
     # 按照framesize切分
     features, labels = segment(data_dict=data_dict, framesize=args.framesize, trainnumber=args.trainnumber)
     draw_fig(features, labels, count=1, prefix='raw', res_dir=res_dir)
-    if args.normal > 0:
-        features = do_scalar(features, args.normal)
-        draw_fig(features, labels, count=1, prefix='normal{}'.format(args.normal), res_dir=res_dir)
+    # if args.normal > 0:
+    #     features = do_scalar(features, args.normal)
+    #     draw_fig(features, labels, count=1, prefix='normal{}'.format(args.normal), res_dir=res_dir)
     if args.fft == 1:
         features = to_fft(features, axes=(1,))
-        draw_fig(features, labels, count=1, prefix='normal{}-fft1'.format(args.normal), res_dir=res_dir)
-
+        # draw_fig(features, labels, count=1, prefix='normal{}-fft1'.format(args.normal), res_dir=res_dir)
 
     features_shuffled, labels_shuffled = shuffle_data(features, labels)
 
@@ -246,7 +274,7 @@ def get_ims(dataroot, severity):
 
 if __name__ == "__main__":
 
-    get_ims(dataroot=args.dataroot, severity='incipient')
-    get_ims(dataroot=args.dataroot, severity='medium')
-    get_ims(dataroot=args.dataroot, severity='severe')
-
+    # get_ims(dataroot=args.dataroot, severity='incipient')
+    # get_ims(dataroot=args.dataroot, severity='medium')
+    # get_ims(dataroot=args.dataroot, severity='severe')
+    get_ims(dataroot=args.dataroot, severity='all')

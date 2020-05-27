@@ -56,15 +56,26 @@ def train_deepcoral(config):
         iter_target = iter(config['target_train_loader'])
         len_source_loader = len(config['source_train_loader'])
         len_target_loader = len(config['target_train_loader'])
+        if config['slim'] > 0:
+            iter_target_semi = iter(config['target_train_semi_loader'])
+            len_target_semi_loader = len(config['target_train_semi_loader'])
+
         num_iter = len_source_loader
         for i in range(1, num_iter+1):
             data_source, label_source = iter_source.next()
             data_target, _ = iter_target.next()
+            if config['slim'] > 0:
+                data_target_semi, label_target_semi = iter_target_semi.next()
+                if i % len_target_semi_loader == 0:
+                    iter_target_semi = iter(config['target_train_semi_loader'])
             if i % len_target_loader == 0:
                 iter_target = iter(config['target_train_loader'])
             if torch.cuda.is_available():
                 data_source, label_source = data_source.cuda(), label_source.cuda()
                 data_target = data_target.cuda()
+                if config['slim'] > 0:
+                    data_target_semi, label_target_semi = data_target_semi.cuda(), label_target_semi.cuda()
+
 
             optimizer.zero_grad()
 
@@ -81,6 +92,14 @@ def train_deepcoral(config):
             # gamma = 2 / (1 + math.exp(-10 * (epoch) / config['n_epochs'])) - 1
             # loss = loss_cls + gamma * loss_coral
             loss = loss_cls + config['mmd_gamma'] * loss_coral
+
+            if config['slim'] > 0:
+                feature_target_semi = extractor(data_target_semi)
+                feature_target_semi = feature_target_semi.view(feature_target_semi.size(0), -1)
+                preds_target_semi = classifier(feature_target_semi)
+                err_t_class_semi = criterion(preds_target_semi, label_target_semi)
+                loss += err_t_class_semi
+
             if i % 50 == 0:
                 print('loss_cls {}, loss_coral {}, gamma {}, total loss {}'.format(loss_cls.item(), loss_coral.item(), config['mmd_gamma'], loss.item()))
             loss.backward()

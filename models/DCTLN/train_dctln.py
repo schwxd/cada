@@ -11,6 +11,7 @@ from utils.vis import draw_tsne, draw_confusion_matrix
 from models.DDC.mmd import mmd_linear
 from networks.network import Extractor, Classifier, Critic, Critic2, RandomLayer, AdversarialNetwork
 from networks.inceptionv1 import InceptionV1, InceptionV1s
+torch.set_num_threads(2)
 
 def train_dctln(config):
     if config['network'] == 'inceptionv1':
@@ -31,10 +32,9 @@ def train_dctln(config):
     loss_class = torch.nn.CrossEntropyLoss()
     loss_domain = torch.nn.CrossEntropyLoss()
 
-    res_dir = os.path.join(config['res_dir'], 'normal{}-{}-dilation{}-lr{}'.format(config['normal'], 
-                                                                                    config['network'],
-                                                                                    config['dilation'],
-                                                                                    config['lr']))
+    res_dir = os.path.join(config['res_dir'], 'slim{}-snr{}-lr{}'.format(config['slim'], 
+                                                                        config['snr'],
+                                                                        config['lr']))
     if not os.path.exists(res_dir):
         os.makedirs(res_dir)
 
@@ -72,15 +72,25 @@ def train_dctln(config):
         iter_target = iter(config['target_train_loader'])
         len_source_loader = len(config['source_train_loader'])
         len_target_loader = len(config['target_train_loader'])
+        if config['slim'] > 0:
+            iter_target_semi = iter(config['target_train_semi_loader'])
+            len_target_semi_loader = len(config['target_train_semi_loader'])
+
         num_iter = len_source_loader
         for i in range(1, num_iter+1):
             data_source, label_source = iter_source.next()
             data_target, _ = iter_target.next()
+            data_target_semi, label_target_semi = iter_target_semi.next()
+
             if i % len_target_loader == 0:
                 iter_target = iter(config['target_train_loader'])
+            if i % len_target_semi_loader == 0:
+                iter_target_semi = iter(config['target_train_semi_loader'])
+
             if torch.cuda.is_available():
                 data_source, label_source = data_source.cuda(), label_source.cuda()
                 data_target = data_target.cuda()
+                data_target_semi, label_target_semi = data_target_semi.cuda(), label_target_semi.cuda()
 
             optimizer.zero_grad()
 
@@ -88,7 +98,7 @@ def train_dctln(config):
             source = source.view(source.size(0), -1)
             target = extractor(data_target)
             target = target.view(target.size(0), -1)
-            loss_mmd = mmd_linear(source, target)
+            # loss_mmd = mmd_linear(source, target)
 
 
             class_output_s, domain_output, _ = dann(input_data=data_source, alpha=gamma)
@@ -101,10 +111,16 @@ def train_dctln(config):
             domain_label = torch.ones(data_target.size(0)).long().cuda()
             class_output_t, domain_output, _ = dann(input_data=data_target, alpha=gamma)
             err_t_domain = loss_domain(domain_output, domain_label)
-            err = err_s_label + err_s_domain + err_t_domain + loss_mmd
 
-            if i % 20 == 0:
-                print('err_s_label {}, err_s_domain {}, gamma {}, err_t_domain {}, loss_mmd {}, total err {}'.format(err_s_label.item(), err_s_domain.item(), gamma, err_t_domain.item(), loss_mmd.item(), err.item()))
+            class_output_semi_t, _, _ = dann(input_data=data_target_semi, alpha=gamma)
+            err_t_label = loss_class(class_output_semi_t, label_target_semi)
+
+            # err = 1.0*err_s_label + err_s_domain + err_t_domain + 0*loss_mmd + err_t_label
+            err = 1.0*err_s_label + err_s_domain + err_t_domain + err_t_label
+
+            # if i % 200 == 0:
+            #     # print('err_s_label {}, err_s_domain {}, gamma {}, err_t_domain {}, loss_mmd {}, total err {}'.format(err_s_label.item(), err_s_domain.item(), gamma, err_t_domain.item(), loss_mmd.item(), err.item()))
+            #     print('err_s_label {:.2f}, err_t_label {:.2f}, err_s_domain {:.2f}, gamma {:.2f}, err_t_domain {:.2f}, total err {:.2f}'.format(err_s_label.item(), err_t_label.item(), err_s_domain.item(), gamma, err_t_domain.item(), err.item()))
 
             err.backward()
             optimizer.step()

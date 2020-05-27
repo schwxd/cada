@@ -88,7 +88,17 @@ def prepro(d_path, framesize, trainnumber, testnumber, res_dir, normal):
         """
 
         filelist = os.listdir(d_path)
-        labels_dict = {}        # label：value对应关系表
+        # labels_dict = {}        # label：value对应关系表
+        labels_dict = {'Normal': 0, 
+                        'IR007': 1, 
+                        'IR014': 2, 
+                        'IR021': 3, 
+                        'B007': 4, 
+                        'B014': 5, 
+                        'B021': 6, 
+                        'OR007@6': 7, 
+                        'OR014@6': 8, 
+                        'OR021@6': 9}
         labels_list = {}        # 每个文件的原始label，用于绘制图形时标注文件名
         label_value = 0
         for filename in filelist:
@@ -102,12 +112,14 @@ def prepro(d_path, framesize, trainnumber, testnumber, res_dir, normal):
             else:
                 label = label1
 
-            if not label in labels_dict:
-                labels_dict[label] = label_value
-                label_value += 1
-            if not label in labels_list:
-                # labels_list[filename] = label_value
-                labels_list[filename] = labels_dict[label]
+            labels_list[filename] = labels_dict[label]
+
+            # if not label in labels_dict:
+            #     labels_dict[label] = label_value
+            #     label_value += 1
+            # if not label in labels_list:
+            #     # labels_list[filename] = label_value
+            #     labels_list[filename] = labels_dict[label]
 
 
         return labels_dict, labels_list 
@@ -243,7 +255,7 @@ if __name__ == "__main__":
     print('subdirs: {}'.format(subdirs))
     for subdir in subdirs:
         print('process subdir {}'.format(subdir))
-        res_dir = 'cwru-fft{}-norm{}-fs{}-num{}/{}{}'.format(args.fft, args.normal, args.framesize, args.trainnumber, args.defe, subdir)
+        res_dir = 'cwru-fft{}-fs{}-num{}/{}{}'.format(args.fft, args.framesize, args.trainnumber, args.defe, subdir)
         if not os.path.exists(res_dir):
             os.makedirs(res_dir)
 
