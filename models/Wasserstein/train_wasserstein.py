@@ -8,16 +8,16 @@ import torch.optim as optim
 
 from models.Wasserstein.triplet_loss import triplet_loss
 
-from networks.network import Extractor, Classifier, Critic, Critic2, RandomLayer, AdversarialNetwork
+from networks.network import Extractor, Classifier, Critic, Critic2, RandomLayer, AdversarialNetwork, Classifier2
 from networks.inceptionv1 import InceptionV1
 
 from utils.functions import test, set_log_config, set_requires_grad, gradient_penalty
 from utils.vis import draw_tsne, draw_confusion_matrix
 
 def train_wasserstein(config):
-    # extractor = Extractor(n_flattens=config['n_flattens'], n_hiddens=config['n_hiddens'])
-    extractor = InceptionV1(num_classes=32)
-    classifier = Classifier(n_flattens=config['n_flattens'], n_hiddens=config['n_hiddens'], n_class=config['n_class'])
+    extractor = Extractor(n_flattens=config['n_flattens'], n_hiddens=config['n_hiddens'])
+    # extractor = InceptionV1(num_classes=32)
+    classifier = Classifier2(n_flattens=config['n_flattens'], n_hiddens=config['n_hiddens'], n_class=config['n_class'])
     critic = Critic(n_flattens=config['n_flattens'], n_hiddens=config['n_hiddens'])
     if torch.cuda.is_available():
         extractor = extractor.cuda()
@@ -138,12 +138,12 @@ def train_wasserstein(config):
                 h_t = extractor(data_target)
                 h_t = h_t.view(h_t.size(0), -1)
 
-                source_preds = classifier(h_s)
+                source_preds, _ = classifier(h_s)
                 clf_loss = criterion(source_preds, label_source)
                 wasserstein_distance = critic(h_s).mean() - critic(h_t).mean()
 
                 if triplet_type != 'none' and epoch >= TRIPLET_START_INDEX:
-                    target_preds = classifier(h_t)
+                    target_preds, _ = classifier(h_t)
                     target_labels = target_preds.data.max(1)[1]
                     target_logits = softmax_layer(target_preds)
                     if triplet_type == 'all':

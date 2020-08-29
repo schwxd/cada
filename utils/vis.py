@@ -30,11 +30,11 @@ def draw_tsne(extractor, classifier, src_data_loader, tgt_data_loader, res_dir, 
             labels = labels.squeeze_().cuda()
 
             embedding = extractor(images)
-            preds = classifier(embedding)
+            preds, hiddens = classifier(embedding)
             pred_cls = preds.data.max(1)[1]
 
             src_y_pred.append(pred_cls.cpu().numpy())
-            src_embeddings.append(embedding.cpu())
+            src_embeddings.append(hiddens.cpu())
             # l1_embeddings = classifier.get_layer3(embedding)
             # src_embeddings.append(l1_embeddings.cpu())
             count += 1
@@ -53,11 +53,11 @@ def draw_tsne(extractor, classifier, src_data_loader, tgt_data_loader, res_dir, 
             labels = labels.squeeze_().cuda()
 
             embedding = extractor(images)
-            preds = classifier(embedding)
+            preds, hiddens = classifier(embedding)
             pred_cls = preds.data.max(1)[1]
 
             tgt_y_pred.append(pred_cls.cpu().numpy())
-            tgt_embeddings.append(embedding.cpu())
+            tgt_embeddings.append(hiddens.cpu())
             # l1_embeddings = classifier.get_layer3(embedding)
             # tgt_embeddings.append(l1_embeddings.cpu())
             count += 1
@@ -280,7 +280,7 @@ def draw_confusion_matrix(extractor, classifier, data_loader, res_dir, epoch, ti
             if torch.cuda.is_available():
                 features, labels = features.cuda(), labels.cuda()
 
-            preds = classifier(extractor(features))
+            preds, _ = classifier(extractor(features))
             pred_cls = preds.data.max(1)[1]
 
             y_pred.append(pred_cls.cpu())

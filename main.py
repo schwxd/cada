@@ -17,10 +17,10 @@ import torch.optim as optim
 # custom imports
 # from cwru_dataset import get_raw_1d
 # from cwru_dataset_all import get_raw_1d
-# from cwru_dataset_normal import get_raw_1d
+from cwru_dataset_normal import get_raw_1d
 # from cwru_dataset_semi import get_raw_1d
 # from cwru_dataset_normal import get_raw_1d
-from cwru_dataset_imbalance import get_raw_1d
+# from cwru_dataset_imbalance import get_raw_1d
 
 
 from models.CNN.train_cnn import train_cnn
@@ -166,7 +166,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
     os.environ["CUDA_VISIBLE_DEVICES"] = args.gpu_id 
 
-    res_dir = 'snapshots_{}/{}--{}'.format(args.models, args.src, args.dest)
+    res_dir = 'snapshots_{}/{}/{}--{}'.format(args.models, args.dataroot, args.src, args.dest)
     if not os.path.exists(res_dir):
         os.makedirs(res_dir)
 
@@ -175,26 +175,7 @@ if __name__ == "__main__":
 
     config = {}
 
-    # config['source_train_loader'], config['source_test_loader'], classes = get_raw_1d(src_dataset, 
-    #                                                                                     batch_size=args.batch_size, 
-    #                                                                                     trainonly=False, 
-    #                                                                                     split=0.8, 
-    #                                                                                     snr=args.snr, 
-    #                                                                                     snrp=args.snrp,
-    #                                                                                     normal=args.normal,
-    #                                                                                     slim=0,
-    #                                                                                     target_labeling=0)
-    # config['target_train_loader'], config['target_test_loader'], _ = get_raw_1d(tgt_dataset, 
-    #                                                                                     batch_size=args.batch_size, 
-    #                                                                                     trainonly=False, 
-    #                                                                                     split=args.split, 
-    #                                                                                     snr=0,
-    #                                                                                     snrp=0,
-    #                                                                                     normal=args.normal,
-    #                                                                                     slim=args.slim,
-    #                                                                                     target_labeling=args.target_labeling)
-
-    config['source_train_loader'], config['source_test_loader'], _, classes = get_raw_1d(src_dataset, 
+    config['source_train_loader'], config['source_test_loader'], classes = get_raw_1d(src_dataset, 
                                                                                         batch_size=args.batch_size, 
                                                                                         trainonly=False, 
                                                                                         split=0.8, 
@@ -203,7 +184,7 @@ if __name__ == "__main__":
                                                                                         normal=args.normal,
                                                                                         slim=0,
                                                                                         target_labeling=0)
-    config['target_train_loader'], config['target_test_loader'], config['target_train_semi_loader'], _ = get_raw_1d(tgt_dataset, 
+    config['target_train_loader'], config['target_test_loader'], _ = get_raw_1d(tgt_dataset, 
                                                                                         batch_size=args.batch_size, 
                                                                                         trainonly=False, 
                                                                                         split=args.split, 
@@ -213,6 +194,26 @@ if __name__ == "__main__":
                                                                                         slim=args.slim,
                                                                                         target_labeling=args.target_labeling)
 
+    # config['source_train_loader'], config['source_test_loader'], _, classes = get_raw_1d(src_dataset, 
+    #                                                                                     batch_size=args.batch_size, 
+    #                                                                                     trainonly=False, 
+    #                                                                                     split=0.8, 
+    #                                                                                     snr=args.snr, 
+    #                                                                                     snrp=args.snrp,
+    #                                                                                     normal=args.normal,
+    #                                                                                     slim=0,
+    #                                                                                     target_labeling=0)
+    # config['target_train_loader'], config['target_test_loader'], config['target_train_semi_loader'], _ = get_raw_1d(tgt_dataset, 
+    #                                                                                     batch_size=args.batch_size, 
+    #                                                                                     trainonly=False, 
+    #                                                                                     split=args.split, 
+    #                                                                                     snr=0,
+    #                                                                                     snrp=0,
+    #                                                                                     normal=args.normal,
+    #                                                                                     slim=args.slim,
+    #                                                                                     target_labeling=args.target_labeling)
+
+    config['dataroot'] = args.dataroot
     config['models'] = args.models
     config['network'] = args.network
     config['dilation'] = args.dilation

@@ -12,7 +12,7 @@ import torch.nn.functional as F
 
 from utils.vis import draw_tsne, draw_confusion_matrix
 from utils.functions import test, set_log_config
-from networks.network import Extractor, Classifier, Critic, Critic2, RandomLayer, AdversarialNetwork, ClassifierAux
+from networks.network import Extractor, Classifier, Classifier2, Critic, Critic2, RandomLayer, AdversarialNetwork, ClassifierAux
 from networks.inceptionv1 import InceptionV1, InceptionV1s
 
 
@@ -23,7 +23,7 @@ def train_cnn(config):
         extractor = InceptionV1s(num_classes=32, dilation=config['dilation'])
     else:
         extractor = Extractor(n_flattens=config['n_flattens'], n_hiddens=config['n_hiddens'])
-    classifier = Classifier(n_flattens=config['n_flattens'], n_hiddens=config['n_hiddens'], n_class=config['n_class'])
+    classifier = Classifier2(n_flattens=config['n_flattens'], n_hiddens=config['n_hiddens'], n_class=config['n_class'])
 
     if torch.cuda.is_available():
         extractor = extractor.cuda()
@@ -58,7 +58,7 @@ def train_cnn(config):
             # if config['aux_classifier'] == 1:
             #     x1, x2, x3 = extractor(features)
             #     preds = classifier(x1, x2, x3)
-            preds = classifier(extractor(features))
+            preds, _ = classifier(extractor(features))
             # print('preds {}, labels {}'.format(preds.shape, labels.shape))
             # print(preds[0])
             # preds_l = F.softmax(preds, dim=1)
@@ -77,8 +77,8 @@ def train_cnn(config):
             test(extractor, classifier, config['source_test_loader'], epoch)
             print('test on target_test_loader')
             test(extractor, classifier, config['target_test_loader'], epoch)
-        # if epoch % config['VIS_INTERVAL'] == 0:
-        #     draw_confusion_matrix(extractor, classifier, config['target_test_loader'], res_dir, epoch, config['models'])
-            # draw_tsne(extractor, classifier, config['source_test_loader'], config['target_test_loader'], res_dir, epoch, config['models'], separate=True)
-            # draw_tsne(extractor, classifier, config['source_test_loader'], config['target_test_loader'], res_dir, epoch, config['models'], separate=False)
+        if epoch % config['VIS_INTERVAL'] == 0:
+            draw_confusion_matrix(extractor, classifier, config['target_test_loader'], res_dir, epoch, config['models'])
+            draw_tsne(extractor, classifier, config['source_test_loader'], config['target_test_loader'], res_dir, epoch, config['models'], separate=True)
+            draw_tsne(extractor, classifier, config['source_test_loader'], config['target_test_loader'], res_dir, epoch, config['models'], separate=False)
 
