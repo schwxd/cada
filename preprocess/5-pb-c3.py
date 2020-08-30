@@ -21,8 +21,11 @@ from sklearn import preprocessing
 FRAME_SIZE = 5120           # 默认滑动窗口大小
 STEP_SIZE = 5100            # 默认滑动窗口移动步长
 
+np.random.seed(0)
+
 parser = argparse.ArgumentParser()
-parser.add_argument('--dataroot', required=False, default='/nas/data/paderborn', help='where the data folder is')
+# parser.add_argument('--dataroot', required=False, default='/nas/data/paderborn', help='where the data folder is')
+parser.add_argument('--dataroot', required=False, default='D:\\fault\\paderborn_dataset', help='where the data folder is')
 parser.add_argument('--framesize', type=int, required=False, default=FRAME_SIZE, help='Frame Size of sliding windows')
 parser.add_argument('--stepsize', type=int, required=False, default=STEP_SIZE, help='Step Size of Sliding window')
 parser.add_argument('--load', type=int, required=False, default=-1, help='Specify one of the load conditions (0/1/2/3). -1 = all')
@@ -275,3 +278,13 @@ if __name__ == '__main__':
         np.save("{}/data_features_train.npy".format(res_dir), features)
         np.save("{}/data_labels_train.npy".format(res_dir), labels)
         print('load {} saved to {}, features {}, labels {}'.format(load, res_dir, features.shape, labels.shape))
+
+        jsObj = json.dumps(labels_map)
+        fileObject = open('{}/labels_map.json'.format(res_dir), 'w')
+        fileObject.write(jsObj)
+        fileObject.close()
+
+        jsObj = json.dumps(loads_map)
+        fileObject = open('{}/loads_map.json'.format(res_dir), 'w')
+        fileObject.write(jsObj)
+        fileObject.close()

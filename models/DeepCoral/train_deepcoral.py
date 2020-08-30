@@ -8,7 +8,7 @@ import torch.optim as optim
 
 from models.DeepCoral.Coral import CORAL
 
-from networks.network import Extractor, Classifier, Critic, Critic2, RandomLayer, AdversarialNetwork
+from networks.network import Extractor, Classifier, Critic, Critic2, RandomLayer, AdversarialNetwork, Classifier2
 from networks.inceptionv1 import InceptionV1, InceptionV1s
 
 from utils.functions import test, set_log_config
@@ -22,7 +22,7 @@ def train_deepcoral(config):
         extractor = InceptionV1s(num_classes=32, dilation=config['dilation'])
     else:
         extractor = Extractor(n_flattens=config['n_flattens'], n_hiddens=config['n_hiddens'])
-    classifier = Classifier(n_flattens=config['n_flattens'], n_hiddens=config['n_hiddens'], n_class=config['n_class'])
+    classifier = Classifier2(n_flattens=config['n_flattens'], n_hiddens=config['n_hiddens'], n_class=config['n_class'])
 
     if torch.cuda.is_available():
         extractor = extractor.cuda()
@@ -84,7 +84,7 @@ def train_deepcoral(config):
             target = extractor(data_target)
             target = target.view(target.size(0), -1)
 
-            preds = classifier(source)
+            preds, _ = classifier(source)
             loss_cls = criterion(preds, label_source)
 
             loss_coral = CORAL(source, target)
@@ -96,7 +96,7 @@ def train_deepcoral(config):
             if config['slim'] > 0:
                 feature_target_semi = extractor(data_target_semi)
                 feature_target_semi = feature_target_semi.view(feature_target_semi.size(0), -1)
-                preds_target_semi = classifier(feature_target_semi)
+                preds_target_semi, _ = classifier(feature_target_semi)
                 err_t_class_semi = criterion(preds_target_semi, label_target_semi)
                 loss += err_t_class_semi
 

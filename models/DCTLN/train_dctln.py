@@ -9,7 +9,7 @@ import torch.optim as optim
 from utils.functions import test, set_log_config, ReverseLayerF
 from utils.vis import draw_tsne, draw_confusion_matrix
 from models.DDC.mmd import mmd_linear
-from networks.network import Extractor, Classifier, Critic, Critic2, RandomLayer, AdversarialNetwork
+from networks.network import Extractor, Classifier, Critic, Critic2, RandomLayer, AdversarialNetwork, Classifier2
 from networks.inceptionv1 import InceptionV1, InceptionV1s
 torch.set_num_threads(2)
 
@@ -20,7 +20,7 @@ def train_dctln(config):
         extractor = InceptionV1s(num_classes=32, dilation=config['dilation'])
     else:
         extractor = Extractor(n_flattens=config['n_flattens'], n_hiddens=config['n_hiddens'])
-    classifier = Classifier(n_flattens=config['n_flattens'], n_hiddens=config['n_hiddens'], n_class=config['n_class'])
+    classifier = Classifier2(n_flattens=config['n_flattens'], n_hiddens=config['n_hiddens'], n_class=config['n_class'])
 
     critic = Critic2(n_flattens=config['n_flattens'], n_hiddens=config['n_hiddens'])
     if torch.cuda.is_available():
@@ -55,7 +55,7 @@ def train_dctln(config):
         feature = extractor(input_data)
         feature = feature.view(feature.size(0), -1)
         reverse_feature = ReverseLayerF.apply(feature, alpha)
-        class_output = classifier(feature)
+        class_output, _ = classifier(feature)
         domain_output = critic(reverse_feature)
 
         return class_output, domain_output, feature
@@ -80,17 +80,20 @@ def train_dctln(config):
         for i in range(1, num_iter+1):
             data_source, label_source = iter_source.next()
             data_target, _ = iter_target.next()
-            data_target_semi, label_target_semi = iter_target_semi.next()
+            if config['slim'] > 0:
+                data_target_semi, label_target_semi = iter_target_semi.next()
 
             if i % len_target_loader == 0:
                 iter_target = iter(config['target_train_loader'])
-            if i % len_target_semi_loader == 0:
-                iter_target_semi = iter(config['target_train_semi_loader'])
+            if config['slim'] > 0:
+                if i % len_target_semi_loader == 0:
+                    iter_target_semi = iter(config['target_train_semi_loader'])
 
             if torch.cuda.is_available():
                 data_source, label_source = data_source.cuda(), label_source.cuda()
                 data_target = data_target.cuda()
-                data_target_semi, label_target_semi = data_target_semi.cuda(), label_target_semi.cuda()
+                if config['slim'] > 0:
+                    data_target_semi, label_target_semi = data_target_semi.cuda(), label_target_semi.cuda()
 
             optimizer.zero_grad()
 
@@ -112,11 +115,13 @@ def train_dctln(config):
             class_output_t, domain_output, _ = dann(input_data=data_target, alpha=gamma)
             err_t_domain = loss_domain(domain_output, domain_label)
 
-            class_output_semi_t, _, _ = dann(input_data=data_target_semi, alpha=gamma)
-            err_t_label = loss_class(class_output_semi_t, label_target_semi)
-
             # err = 1.0*err_s_label + err_s_domain + err_t_domain + 0*loss_mmd + err_t_label
-            err = 1.0*err_s_label + err_s_domain + err_t_domain + err_t_label
+            err = 1.0*err_s_label + err_s_domain + err_t_domain
+            
+            if config['slim'] > 0:
+                class_output_semi_t, _, _ = dann(input_data=data_target_semi, alpha=gamma)
+                err_t_label = loss_class(class_output_semi_t, label_target_semi)
+                err += err_t_label
 
             # if i % 200 == 0:
             #     # print('err_s_label {}, err_s_domain {}, gamma {}, err_t_domain {}, loss_mmd {}, total err {}'.format(err_s_label.item(), err_s_domain.item(), gamma, err_t_domain.item(), loss_mmd.item(), err.item()))

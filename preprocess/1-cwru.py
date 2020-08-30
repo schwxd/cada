@@ -5,6 +5,7 @@ from sklearn import preprocessing  # 0-1编码
 from sklearn.model_selection import StratifiedShuffleSplit  # 随机划分，保证每一类比例相同
 import matplotlib.pyplot as plt
 
+np.random.seed(0)
 
 def prepro(d_path, framesize, trainnumber, testnumber, res_dir, normal):
     """对数据进行预处理,返回train_X, train_Y, test_X, test_Y样本.
