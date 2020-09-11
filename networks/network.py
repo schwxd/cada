@@ -18,21 +18,21 @@ class Extractor(nn.Module):
         self.feature = nn.Sequential()
 
         # features 使用1-D CNN提取特征
-        self.feature.add_module('f_conv1', nn.Conv1d(1, 8, kernel_size=8, stride=2))
+        self.feature.add_module('f_conv1', nn.Conv1d(1, 8, kernel_size=32, stride=2))
         if bn:
             self.feature.add_module('f_bn1', nn.BatchNorm1d(8))
         self.feature.add_module('f_relu1', nn.ReLU(True))
         self.feature.add_module('f_pool1', nn.MaxPool1d(kernel_size=2, stride=2))
         self.feature.add_module('f_drop1', nn.Dropout(0.5))
 
-        self.feature.add_module('f_conv2', nn.Conv1d(8, 16, kernel_size=5, stride=2))
+        self.feature.add_module('f_conv2', nn.Conv1d(8, 16, kernel_size=16, stride=2))
         if bn:
             self.feature.add_module('f_bn2', nn.BatchNorm1d(16))
         self.feature.add_module('f_relu2', nn.ReLU(True))
         self.feature.add_module('f_pool2', nn.MaxPool1d(kernel_size=2, stride=2))
         self.feature.add_module('f_drop2', nn.Dropout(0.5))
 
-        self.feature.add_module('f_conv3', nn.Conv1d(16, 32, kernel_size=5, stride=2))
+        self.feature.add_module('f_conv3', nn.Conv1d(16, 32, kernel_size=8, stride=2))
         if bn:
             self.feature.add_module('f_bn3', nn.BatchNorm1d(32))
         self.feature.add_module('f_relu3', nn.ReLU(True))

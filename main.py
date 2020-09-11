@@ -45,8 +45,11 @@ from models.dann_vat.train_dann_vat import train_dann_vat
 from models.tcl.train_tcl import train_tcl
 from models.tcl_vat.train_tcl_vat import train_tcl_vat
 from models.AEMMD.train_aemmd import train_aemmd
+from models.GTA.train_gta import train_gta
+from models.GTA.train_gta_unet import train_gta_unet
+from models.DRCN.train_drcn import train_drcn
 
-torch.set_num_threads(12)
+# torch.set_num_threads(2)
 
 def train(config):
     if config['models'] == 'sourceonly':
@@ -91,6 +94,15 @@ def train(config):
         train_tcl_vat(config)
     elif config['models'] == 'aemmd':
         train_aemmd(config)
+    elif config['models'] == 'GTA':
+        train_gta(config)
+    elif config['models'] == 'GTAU':
+        train_gta_unet(config)
+    # elif config['models'] == 'RACGAN':
+    #     train_racgan(config)
+    elif config['models'] == 'DRCN':
+        train_drcn(config)
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Transfer Learning')
@@ -166,7 +178,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
     os.environ["CUDA_VISIBLE_DEVICES"] = args.gpu_id 
 
-    res_dir = 'snapshots_{}/{}/{}--{}'.format(args.models, args.dataroot, args.src, args.dest)
+    res_dir = 'snapshots_{}/{}/{}--{}'.format(args.models, args.dataroot.split('/')[-1], args.src, args.dest)
     if not os.path.exists(res_dir):
         os.makedirs(res_dir)
 
@@ -267,5 +279,7 @@ if __name__ == "__main__":
     config['bnm_sw'] = args.bnm_sw
     config['bnm_tw'] = args.bnm_tw
     config['bnm_ew'] = args.bnm_ew
+
+    config['nz'] = 16
 
     train(config)

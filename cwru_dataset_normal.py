@@ -138,7 +138,7 @@ def get_raw_1d(rootdir, batch_size, trainonly=False, split=0.5, snr=0, snrp=0, n
         elif target_labeling == 2:
             # 只保留healthy，类标是6
             # labels_dict {'B007': 0, 'B014': 1, 'B021': 2, 'IR007': 3, 'IR014': 4, 'IR021': 5, 'Normal': 6, 'OR007@6': 7, 'OR014@6': 8, 'OR021@6': 9}
-            selected = 3
+            selected = 2
 
             train_labels_slim = train_labels[train_labels == selected]
             train_features_slim = train_features[train_labels == selected]
